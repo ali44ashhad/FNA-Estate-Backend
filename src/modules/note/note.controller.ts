@@ -4,7 +4,7 @@ import * as NoteService from "./note.service";
 
 export const addNote = async (req: Request, res: Response) => {
   const input = createNoteSchema.parse(req.body);
-  const note = await NoteService.addNote(req.user, input);
+  const note = await NoteService.addNote(req.user!, input);
 
   res.json({
     success: true,
@@ -15,7 +15,7 @@ export const addNote = async (req: Request, res: Response) => {
 
 export const getNotes = async (req: Request, res: Response) => {
   const leadId = Array.isArray(req.params.leadId) ? req.params.leadId[0] : req.params.leadId;
-  const data = await NoteService.getNotesByLead(req.user, leadId);
+  const data = await NoteService.getNotesByLead(req.user!, leadId);
 
   res.json({
     success: true,
