@@ -5,7 +5,7 @@ export type AuthTokenPayload = {
   role: string;
 };
 
-const ACCESS_TOKEN_EXPIRES_IN = "15m";
+const ACCESS_TOKEN_EXPIRES_IN = "3h";
 const REFRESH_TOKEN_EXPIRES_IN = "7d";
 
 function getJwtSecret(): string {
@@ -32,5 +32,19 @@ export function generateRefreshToken(payload: AuthTokenPayload) {
 
 export function verifyAccessToken(token: string) {
   return jwt.verify(token, getJwtSecret());
+}
+
+export function verifyRefreshToken(token: string): AuthTokenPayload {
+  const decoded = jwt.verify(token, getJwtRefreshSecret());
+  if (typeof decoded !== "object" || decoded === null) {
+    throw new Error("Invalid token");
+  }
+
+  const payload = decoded as { id?: unknown; role?: unknown };
+  if (typeof payload.id !== "string" || typeof payload.role !== "string") {
+    throw new Error("Invalid token");
+  }
+
+  return { id: payload.id, role: payload.role };
 }
 

@@ -7,6 +7,7 @@ const router = Router();
 router.post("/register", AuthController.registerUser);
 router.post("/login", AuthController.loginUser);
 router.post("/employee/login", AuthController.loginEmployee);
+router.post("/refresh", AuthController.refresh);
 
 router.get("/me", authMiddleware, (req, res) => {
   res.json({

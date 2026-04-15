@@ -21,6 +21,24 @@ export const errorHandler = (
     });
   }
 
+  if (typeof err === "object" && err !== null && "name" in err) {
+    const name = (err as { name?: unknown }).name;
+    if (name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Access token expired",
+        error: null
+      });
+    }
+    if (name === "JsonWebTokenError" || name === "NotBeforeError") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid access token",
+        error: null
+      });
+    }
+  }
+
   if (
     typeof err === "object" &&
     err !== null &&

@@ -53,3 +53,16 @@ export const loginEmployee = async (req: Request, res: Response) => {
   });
 };
 
+export const refresh = async (req: Request, res: Response) => {
+  const token = req.cookies[REFRESH_COOKIE_NAME] as string | undefined;
+  const result = await AuthService.refreshSession(token);
+
+  res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions());
+
+  res.json({
+    success: true,
+    message: "Token refreshed",
+    data: { accessToken: result.accessToken }
+  });
+};
+

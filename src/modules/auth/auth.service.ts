@@ -2,7 +2,9 @@ import bcrypt from "bcrypt";
 import { AppError } from "../../shared/errors/AppError";
 import {
   generateAccessToken,
-  generateRefreshToken
+  generateRefreshToken,
+  type AuthTokenPayload,
+  verifyRefreshToken
 } from "../../shared/utils/jwt";
 import { Employee } from "../employee/employee.model";
 import { User } from "../user/user.model";
@@ -61,6 +63,39 @@ export async function loginEmployee(data: LoginInput) {
       email: employee.email,
       role: employee.role
     }
+  };
+}
+
+export async function refreshSession(refreshToken: string | undefined) {
+  if (!refreshToken?.trim()) {
+    throw new AppError("Refresh token required", 401);
+  }
+
+  let payload: AuthTokenPayload;
+  try {
+    payload = verifyRefreshToken(refreshToken);
+  } catch {
+    throw new AppError("Invalid or expired refresh token", 401);
+  }
+
+  if (payload.role === "user") {
+    const user = await User.findById(payload.id);
+    if (!user) throw new AppError("Invalid or expired refresh token", 401);
+
+    const nextPayload = { id: String(user._id), role: "user" };
+    return {
+      accessToken: generateAccessToken(nextPayload),
+      refreshToken: generateRefreshToken(nextPayload)
+    };
+  }
+
+  const employee = await Employee.findById(payload.id);
+  if (!employee) throw new AppError("Invalid or expired refresh token", 401);
+
+  const nextPayload = { id: String(employee._id), role: employee.role };
+  return {
+    accessToken: generateAccessToken(nextPayload),
+    refreshToken: generateRefreshToken(nextPayload)
   };
 }
 
