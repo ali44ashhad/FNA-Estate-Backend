@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { loginSchema, registerUserSchema } from "./auth.dto";
+import { googleCodeSchema, loginSchema, registerUserSchema } from "./auth.dto";
 import * as AuthService from "./auth.service";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
@@ -63,6 +63,19 @@ export const refresh = async (req: Request, res: Response) => {
     success: true,
     message: "Token refreshed",
     data: { accessToken: result.accessToken }
+  });
+};
+
+export const googleCode = async (req: Request, res: Response) => {
+  const input = googleCodeSchema.parse(req.body);
+  const result = await AuthService.googleCode(input);
+
+  res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions());
+
+  res.json({
+    success: true,
+    message: "Login successful",
+    data: { accessToken: result.accessToken, user: result.user }
   });
 };
 

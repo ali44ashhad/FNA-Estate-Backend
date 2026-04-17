@@ -6,6 +6,7 @@ const router = Router();
 
 router.post("/register", AuthController.registerUser);
 router.post("/login", AuthController.loginUser);
+router.post("/google/code", AuthController.googleCode);
 router.post("/employee/login", AuthController.loginEmployee);
 router.post("/refresh", AuthController.refresh);
 

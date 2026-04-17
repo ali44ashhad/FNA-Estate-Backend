@@ -11,6 +11,11 @@ export const loginSchema = z.object({
   password: z.string().min(1)
 });
 
+export const googleCodeSchema = z.object({
+  code: z.string().min(1)
+});
+
 export type RegisterUserInput = z.infer<typeof registerUserSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type GoogleCodeInput = z.infer<typeof googleCodeSchema>;
 
