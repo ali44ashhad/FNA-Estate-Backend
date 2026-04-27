@@ -6,7 +6,7 @@ export type CreateEmployeeData = {
   email: string;
   password: string;
   role: IEmployee["role"];
-  cityId: Types.ObjectId;
+  cityId?: Types.ObjectId;
 };
 
 export async function createEmployee(data: CreateEmployeeData) {

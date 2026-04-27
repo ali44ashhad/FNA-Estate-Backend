@@ -41,7 +41,11 @@ export async function createEmployee(input: CreateEmployeeInput) {
   const existing = await repo.findEmployeeByEmail(input.email);
   if (existing) throw new AppError("Employee already exists", 400);
 
-  await assertCityExists(input.cityId);
+  if (input.role !== "admin") {
+    await assertCityExists(input.cityId);
+  } else if (typeof input.cityId === "string") {
+    await assertCityExists(input.cityId);
+  }
 
   const hashedPassword = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
 
@@ -50,7 +54,7 @@ export async function createEmployee(input: CreateEmployeeInput) {
     email: input.email,
     password: hashedPassword,
     role: input.role,
-    cityId: new mongoose.Types.ObjectId(input.cityId)
+    ...(typeof input.cityId === "string" ? { cityId: new mongoose.Types.ObjectId(input.cityId) } : {})
   });
 
   return sanitizeEmployee(created);
