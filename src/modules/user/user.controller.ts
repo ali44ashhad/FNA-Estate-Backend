@@ -23,3 +23,14 @@ export const updateProfile = async (req: Request, res: Response) => {
   });
 };
 
+export const getUsers = async (req: Request, res: Response) => {
+  void req;
+  const users = await UserService.getUsers();
+
+  res.json({
+    success: true,
+    message: "OK",
+    data: users
+  });
+};
+

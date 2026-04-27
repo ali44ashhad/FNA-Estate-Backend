@@ -7,10 +7,11 @@ type PublicUser = {
   id: string;
   name: string;
   email: string;
+  createdAt?: Date;
 };
 
-function sanitizeUser(user: { _id: unknown; name: string; email: string }): PublicUser {
-  return { id: String(user._id), name: user.name, email: user.email };
+function sanitizeUser(user: { _id: unknown; name: string; email: string; createdAt?: Date }): PublicUser {
+  return { id: String(user._id), name: user.name, email: user.email, createdAt: user.createdAt };
 }
 
 function assertValidUserId(userId: string) {
@@ -39,5 +40,10 @@ export async function updateProfile(userId: string, input: UpdateUserInput) {
   if (!user) throw new AppError("User not found", 404);
 
   return sanitizeUser(user);
+}
+
+export async function getUsers() {
+  const users = await repo.findUsers();
+  return users.map((u) => sanitizeUser(u));
 }
 
