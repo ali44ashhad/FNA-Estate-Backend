@@ -3,12 +3,21 @@ import { z } from "zod";
 
 export const createCitySchema = z.object({
   name: z.string().trim().min(1),
-  state: z.string().trim().min(1)
+  state: z.string().trim().min(1),
+  pincode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, { message: "Pincode must be 6 digits" })
 });
 
 export const updateCitySchema = z.object({
   name: z.string().trim().min(1).optional(),
-  state: z.string().trim().min(1).optional()
+  state: z.string().trim().min(1).optional(),
+  pincode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, { message: "Pincode must be 6 digits" })
+    .optional()
 });
 
 export const cityIdParamSchema = z

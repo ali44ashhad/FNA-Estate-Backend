@@ -4,6 +4,7 @@ import { City } from "./city.model";
 export type CreateCityData = {
   name: string;
   state: string;
+  pincode: string;
 };
 
 export type UpdateCityData = Partial<CreateCityData>;
@@ -29,6 +30,10 @@ export async function findCityByNameState(name: string, state: string) {
   });
 }
 
+export async function findCityByPincode(pincode: string) {
+  return City.findOne({ pincode, isDeleted: false });
+}
+
 export async function findDuplicateCityExcludingId(
   id: Types.ObjectId,
   name: string,
@@ -38,6 +43,14 @@ export async function findDuplicateCityExcludingId(
     _id: { $ne: id },
     name: exactCaseInsensitive(name),
     state: exactCaseInsensitive(state),
+    isDeleted: false
+  });
+}
+
+export async function findDuplicatePincodeExcludingId(id: Types.ObjectId, pincode: string) {
+  return City.findOne({
+    _id: { $ne: id },
+    pincode,
     isDeleted: false
   });
 }
