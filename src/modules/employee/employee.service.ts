@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import { AppError } from "../../shared/errors/AppError";
-import type { CreateEmployeeInput } from "./employee.dto";
+import type { CreateEmployeeInput, FilterEmployeesInput } from "./employee.dto";
 import * as repo from "./employee.repository";
 import { assertCityExists } from "../city/city.service";
 
@@ -73,5 +73,39 @@ export async function getEmployees() {
       updatedAt: e.updatedAt
     })
   );
+}
+
+export async function getEmployeesPaged(
+  filters: FilterEmployeesInput,
+  pagination: { skip: number; limit: number }
+) {
+  const repoFilters: repo.EmployeeFilters = {};
+
+  if (typeof filters.role === "string") {
+    repoFilters.role = filters.role as any;
+  }
+
+  if (typeof filters.q === "string") {
+    repoFilters.q = filters.q.trim();
+  }
+
+  const [employees, total] = await Promise.all([
+    repo.findEmployees(repoFilters, pagination),
+    repo.countEmployees(repoFilters)
+  ]);
+
+  const items = employees.map((e) =>
+    sanitizeEmployee({
+      _id: e._id,
+      name: e.name,
+      email: e.email,
+      role: e.role,
+      cityId: e.cityId,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt
+    })
+  );
+
+  return { items, total };
 }
 
