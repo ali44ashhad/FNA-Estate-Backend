@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
-import { cityIdParamSchema, createCitySchema, updateCitySchema } from "./city.dto";
+import {
+  cityIdParamSchema,
+  createCitySchema,
+  filterCitiesSchema,
+  updateCitySchema
+} from "./city.dto";
 import * as CityService from "./city.service";
+import { getPagination } from "../../shared/utils/pagination";
 
 export const createCity = async (req: Request, res: Response) => {
   const input = createCitySchema.parse(req.body);
@@ -14,13 +20,34 @@ export const createCity = async (req: Request, res: Response) => {
 };
 
 export const getCities = async (req: Request, res: Response) => {
-  void req;
-  const cities = await CityService.getCities();
+  const filters = filterCitiesSchema.parse(req.query);
+
+  const wantsPagination =
+    filters.page !== undefined || filters.limit !== undefined || filters.q !== undefined;
+
+  if (!wantsPagination) {
+    const cities = await CityService.getCities();
+    res.json({
+      success: true,
+      message: "OK",
+      data: cities
+    });
+    return;
+  }
+
+  const { page, limit, skip } = getPagination({ page: filters.page, limit: filters.limit });
+  const { items, total } = await CityService.getCitiesPaged(filters, { skip, limit });
 
   res.json({
     success: true,
     message: "OK",
-    data: cities
+    data: items,
+    meta: {
+      page,
+      limit,
+      total,
+      hasNext: page * limit < total
+    }
   });
 };
 

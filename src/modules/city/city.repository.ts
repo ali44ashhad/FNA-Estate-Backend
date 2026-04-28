@@ -9,6 +9,15 @@ export type CreateCityData = {
 
 export type UpdateCityData = Partial<CreateCityData>;
 
+export type CityFilters = {
+  q?: string;
+};
+
+export type CityFindOptions = {
+  skip: number;
+  limit: number;
+};
+
 function exactCaseInsensitive(value: string) {
   const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^${escaped}$`, "i");
@@ -57,6 +66,28 @@ export async function findDuplicatePincodeExcludingId(id: Types.ObjectId, pincod
 
 export async function getAllCities() {
   return City.find({ isDeleted: false }).sort({ name: 1, state: 1 });
+}
+
+function buildFindQuery(filters: CityFilters) {
+  const query: Record<string, unknown> = { isDeleted: false };
+
+  if (filters.q) {
+    const escaped = filters.q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(escaped, "i");
+    query.$or = [{ name: re }, { state: re }, { pincode: re }];
+  }
+
+  return query;
+}
+
+export async function findCities(filters: CityFilters, options: CityFindOptions) {
+  const query = buildFindQuery(filters);
+  return City.find(query).sort({ name: 1, state: 1 }).skip(options.skip).limit(options.limit);
+}
+
+export async function countCities(filters: CityFilters) {
+  const query = buildFindQuery(filters);
+  return City.countDocuments(query);
 }
 
 export async function updateCity(id: Types.ObjectId, data: UpdateCityData) {

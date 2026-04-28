@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { AppError } from "../../shared/errors/AppError";
-import type { CreateCityInput, UpdateCityInput } from "./city.dto";
+import type { CreateCityInput, FilterCitiesInput, UpdateCityInput } from "./city.dto";
 import * as repo from "./city.repository";
 
 type PublicCity = {
@@ -69,6 +69,32 @@ export async function getCities() {
       updatedAt: c.updatedAt
     })
   );
+}
+
+export async function getCitiesPaged(
+  filters: FilterCitiesInput,
+  pagination: { skip: number; limit: number }
+) {
+  const repoFilters: repo.CityFilters = {};
+  if (typeof filters.q === "string") repoFilters.q = filters.q.trim();
+
+  const [cities, total] = await Promise.all([
+    repo.findCities(repoFilters, pagination),
+    repo.countCities(repoFilters)
+  ]);
+
+  const items = cities.map((c) =>
+    sanitizeCity({
+      _id: c._id,
+      name: c.name,
+      state: c.state,
+      pincode: c.pincode,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt
+    })
+  );
+
+  return { items, total };
 }
 
 export async function updateCity(cityId: string, input: UpdateCityInput) {
