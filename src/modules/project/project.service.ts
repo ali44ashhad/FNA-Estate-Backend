@@ -18,6 +18,8 @@ type PublicProject = {
   propertyType: string;
   status: string;
   pricingType: "unit_based" | "direct";
+  amenities: string[];
+  description: string;
   units?: { type: string; minPrice: number; maxPrice: number; size?: string }[];
   price?: { min: number; max: number };
   images: string[];
@@ -38,6 +40,8 @@ function sanitizeProject(project: {
   propertyType: string;
   status: string;
   pricingType: "unit_based" | "direct";
+  amenities?: unknown;
+  description?: unknown;
   units?: unknown;
   price?: unknown;
   images: string[];
@@ -46,6 +50,14 @@ function sanitizeProject(project: {
   updatedAt?: Date;
 }): PublicProject {
   const city = project.cityId as { _id?: unknown; name?: unknown; state?: unknown } | undefined;
+
+  const amenities = Array.isArray(project.amenities)
+    ? project.amenities
+        .map((a) => (typeof a === "string" ? a.trim() : ""))
+        .filter(Boolean)
+    : [];
+
+  const description = typeof project.description === "string" ? project.description : "";
 
   const units = Array.isArray(project.units)
     ? project.units
@@ -94,6 +106,8 @@ function sanitizeProject(project: {
     propertyType: project.propertyType,
     status: project.status,
     pricingType: project.pricingType,
+    amenities,
+    description,
     units: units && units.length > 0 ? (units as any) : undefined,
     price,
     images: Array.isArray(project.images) ? project.images : [],
@@ -124,6 +138,8 @@ export async function createProject(input: CreateProjectInput) {
     propertyType: input.propertyType,
     status: input.status,
     pricingType: input.pricingType,
+    amenities: input.amenities ?? [],
+    description: input.description ?? "",
     units: input.units,
     price: input.price,
     images: input.images ?? []
@@ -138,6 +154,8 @@ export async function createProject(input: CreateProjectInput) {
     propertyType: reloaded.propertyType,
     status: reloaded.status,
     pricingType: reloaded.pricingType,
+    amenities: (reloaded as any).amenities,
+    description: (reloaded as any).description,
     units: (reloaded as any).units,
     price: (reloaded as any).price,
     images: reloaded.images,
@@ -181,6 +199,8 @@ export async function getProjects(
       propertyType: p.propertyType,
       status: p.status,
       pricingType: (p as any).pricingType,
+      amenities: (p as any).amenities,
+      description: (p as any).description,
       units: (p as any).units,
       price: (p as any).price,
       images: p.images,
@@ -205,6 +225,8 @@ export async function getProjectById(projectId: string) {
     propertyType: project.propertyType,
     status: project.status,
     pricingType: (project as any).pricingType,
+    amenities: (project as any).amenities,
+    description: (project as any).description,
     units: (project as any).units,
     price: (project as any).price,
     images: project.images,
@@ -251,6 +273,8 @@ export async function updateProject(projectId: string, input: UpdateProjectInput
     ...(typeof input.propertyType === "string" ? { propertyType: input.propertyType as any } : {}),
     ...(typeof input.status === "string" ? { status: input.status } : {}),
     ...(typeof input.pricingType === "string" ? { pricingType: input.pricingType as any } : {}),
+    ...(input.amenities !== undefined ? { amenities: input.amenities ?? [] } : {}),
+    ...(input.description !== undefined ? { description: input.description ?? "" } : {}),
     ...(input.units !== undefined ? { units: input.units as any } : {}),
     ...(input.price !== undefined ? { price: input.price as any } : {}),
     ...(input.images !== undefined ? { images: input.images ?? [] } : {})
@@ -263,6 +287,8 @@ export async function updateProject(projectId: string, input: UpdateProjectInput
     propertyType: updated.propertyType,
     status: updated.status,
     pricingType: (updated as any).pricingType,
+    amenities: (updated as any).amenities,
+    description: (updated as any).description,
     units: (updated as any).units,
     price: (updated as any).price,
     images: updated.images,
@@ -350,6 +376,8 @@ export async function recommendProjects(input: RecommendProjectsInput) {
       propertyType: p.propertyType,
       status: p.status,
       pricingType: (p as any).pricingType,
+      amenities: (p as any).amenities,
+      description: (p as any).description,
       units: (p as any).units,
       price: (p as any).price,
       images: p.images,

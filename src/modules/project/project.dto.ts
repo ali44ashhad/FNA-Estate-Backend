@@ -25,6 +25,11 @@ export const createProjectSchema = z.object({
   propertyType: z.enum(["apartment", "plot", "villa"]),
   status: z.string().min(1),
   pricingType: z.enum(["unit_based", "direct"]),
+  amenities: z.array(z.string().min(1)).optional(),
+  description: z
+    .string()
+    .transform((s) => s.trim())
+    .optional(),
   units: z
     .array(
       z.object({
@@ -55,6 +60,11 @@ export const updateProjectSchema = z
     propertyType: z.enum(["apartment", "plot", "villa"]).optional(),
     status: z.string().min(1).optional(),
     pricingType: z.enum(["unit_based", "direct"]).optional(),
+    amenities: z.array(z.string().min(1)).optional(),
+    description: z
+      .string()
+      .transform((s) => s.trim())
+      .optional(),
     units: z
       .array(
         z.object({

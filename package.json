@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "seed:admin": "node -r ts-node/register/transpile-only src/scripts/seedAdmin.ts",
+    "seed:projects": "node -r ts-node/register/transpile-only src/scripts/seedProjects.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

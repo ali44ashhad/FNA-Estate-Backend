@@ -16,6 +16,8 @@ export interface IProject extends Document {
   propertyType: ProjectPropertyType;
   status: string;
   pricingType: ProjectPricingType;
+  amenities?: string[];
+  description?: string;
 
   units?: {
     type: string;
@@ -53,6 +55,18 @@ const projectSchema = new Schema<IProject>(
       enum: PROJECT_PRICING_TYPES,
       required: true
     },
+    amenities: {
+      type: [String],
+      default: [],
+      set: (vals: unknown) => {
+        const arr = Array.isArray(vals) ? vals : [];
+        const cleaned = arr
+          .map((v) => (typeof v === "string" ? v.trim() : ""))
+          .filter(Boolean);
+        return [...new Set(cleaned)];
+      }
+    },
+    description: { type: String, trim: true, default: "" },
     units: [
       {
         type: { type: String, required: true, trim: true },
@@ -74,6 +88,7 @@ const projectSchema = new Schema<IProject>(
 
 projectSchema.index({ cityId: 1 });
 projectSchema.index({ propertyType: 1 });
+projectSchema.index({ amenities: 1 });
 projectSchema.index({ "price.min": 1 });
 projectSchema.index({ "units.minPrice": 1 });
 

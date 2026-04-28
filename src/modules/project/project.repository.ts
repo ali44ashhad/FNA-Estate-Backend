@@ -7,6 +7,8 @@ export type CreateProjectData = {
   propertyType: "apartment" | "plot" | "villa";
   status: string;
   pricingType: "unit_based" | "direct";
+  amenities?: string[];
+  description?: string;
   units?: { type: string; minPrice: number; maxPrice: number; size?: string }[];
   price?: { min: number; max: number };
   images: string[];
