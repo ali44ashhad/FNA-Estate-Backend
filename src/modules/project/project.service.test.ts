@@ -10,7 +10,10 @@ vi.mock("./project.repository", async () => {
 
   return {
     ...actual,
-    findProjects: vi.fn()
+    findProjects: vi.fn(),
+    findProjectRawById: vi.fn(),
+    updateProjectById: vi.fn(),
+    softDeleteProjectById: vi.fn()
   };
 });
 
@@ -230,6 +233,63 @@ describe("project.service getProjects price filter passthrough", () => {
       expect.objectContaining({ minPrice: 100, maxPrice: 200 }),
       expect.anything()
     );
+  });
+});
+
+describe("project.service updateProject/deleteProject", () => {
+  const projectId = "507f191e810c19729de860ff";
+  const projectDocId = { toString: () => projectId };
+
+  const baseCurrent = {
+    _id: projectDocId,
+    name: "Proj",
+    cityId: projectDocId,
+    propertyType: "villa",
+    status: "active",
+    pricingType: "direct",
+    price: { min: 10, max: 20 },
+    units: [],
+    images: []
+  };
+
+  it("throws 400 when switching to unit_based without units", async () => {
+    vi.mocked(ProjectRepo.findProjectRawById).mockResolvedValue(baseCurrent as any);
+    vi.mocked(ProjectRepo.updateProjectById).mockResolvedValue(null as any);
+
+    await expect(
+      ProjectService.updateProject(projectId, {
+        pricingType: "unit_based"
+      } as any)
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("validates city when cityId changes", async () => {
+    vi.mocked(ProjectRepo.findProjectRawById).mockResolvedValue(baseCurrent as any);
+    vi.mocked(CityService.assertCityExists).mockResolvedValue(undefined as any);
+    vi.mocked(ProjectRepo.updateProjectById).mockResolvedValue({
+      _id: projectDocId,
+      name: "Proj",
+      cityId: { _id: projectDocId, name: "City", state: "ST" },
+      propertyType: "villa",
+      status: "active",
+      pricingType: "direct",
+      price: { min: 10, max: 20 },
+      units: [],
+      images: []
+    } as any);
+
+    await ProjectService.updateProject(projectId, {
+      cityId: "507f191e810c19729de860aa"
+    } as any);
+
+    expect(CityService.assertCityExists).toHaveBeenCalled();
+    expect(ProjectRepo.updateProjectById).toHaveBeenCalled();
+  });
+
+  it("throws 404 when deleting missing project", async () => {
+    vi.mocked(ProjectRepo.softDeleteProjectById).mockResolvedValue(null as any);
+
+    await expect(ProjectService.deleteProject(projectId)).rejects.toMatchObject({ statusCode: 404 });
   });
 });
 

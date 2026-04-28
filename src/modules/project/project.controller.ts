@@ -1,5 +1,10 @@
 import type { Request, Response } from "express";
-import { createProjectSchema, filterProjectSchema, recommendProjectsSchema } from "./project.dto";
+import {
+  createProjectSchema,
+  filterProjectSchema,
+  recommendProjectsSchema,
+  updateProjectSchema
+} from "./project.dto";
 import * as ProjectService from "./project.service";
 import { getPagination } from "../../shared/utils/pagination";
 
@@ -40,6 +45,28 @@ export const getProjectById = async (req: Request, res: Response) => {
     success: true,
     message: "OK",
     data: project
+  });
+};
+
+export const updateProject = async (req: Request, res: Response) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const input = updateProjectSchema.parse(req.body);
+  const project = await ProjectService.updateProject(id, input);
+
+  res.json({
+    success: true,
+    message: "Project updated",
+    data: project
+  });
+};
+
+export const deleteProject = async (req: Request, res: Response) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  await ProjectService.deleteProject(id);
+
+  res.json({
+    success: true,
+    message: "Project deleted"
   });
 };
 

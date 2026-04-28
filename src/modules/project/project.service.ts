@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 import { AppError } from "../../shared/errors/AppError";
-import type { CreateProjectInput, FilterProjectInput, RecommendProjectsInput } from "./project.dto";
+import type {
+  CreateProjectInput,
+  FilterProjectInput,
+  RecommendProjectsInput,
+  UpdateProjectInput
+} from "./project.dto";
 import * as repo from "./project.repository";
 import { assertCityExists } from "../city/city.service";
 import * as questionRepo from "../questionnaire/question.repository";
@@ -207,6 +212,70 @@ export async function getProjectById(projectId: string) {
     createdAt: project.createdAt,
     updatedAt: project.updatedAt
   });
+}
+
+export async function updateProject(projectId: string, input: UpdateProjectInput) {
+  assertValidProjectId(projectId);
+  const id = new mongoose.Types.ObjectId(projectId);
+
+  const current = await repo.findProjectRawById(id);
+  if (!current) throw new AppError("Project not found", 404);
+
+  const currentCityId = String((current as any).cityId);
+
+  const nextPricingType =
+    input.pricingType ?? ((current as any).pricingType as "unit_based" | "direct" | undefined);
+
+  const nextUnits = input.units ?? ((current as any).units as any);
+  const nextPrice = input.price ?? ((current as any).price as any);
+
+  if (typeof input.cityId === "string" && input.cityId !== currentCityId) {
+    await assertCityExists(input.cityId);
+  }
+
+  if (nextPricingType === "unit_based") {
+    if (!Array.isArray(nextUnits) || nextUnits.length === 0) {
+      throw new AppError("Units required for unit-based pricing", 400);
+    }
+  }
+
+  if (nextPricingType === "direct") {
+    if (!nextPrice) {
+      throw new AppError("Price required for direct pricing", 400);
+    }
+  }
+
+  const updated = await repo.updateProjectById(id, {
+    ...(typeof input.name === "string" ? { name: input.name } : {}),
+    ...(typeof input.cityId === "string" ? { cityId: new mongoose.Types.ObjectId(input.cityId) } : {}),
+    ...(typeof input.propertyType === "string" ? { propertyType: input.propertyType as any } : {}),
+    ...(typeof input.status === "string" ? { status: input.status } : {}),
+    ...(typeof input.pricingType === "string" ? { pricingType: input.pricingType as any } : {}),
+    ...(input.units !== undefined ? { units: input.units as any } : {}),
+    ...(input.price !== undefined ? { price: input.price as any } : {}),
+    ...(input.images !== undefined ? { images: input.images ?? [] } : {})
+  } as any);
+  if (!updated) throw new AppError("Project not found", 404);
+
+  return sanitizeProject({
+    _id: updated._id,
+    name: updated.name,
+    propertyType: updated.propertyType,
+    status: updated.status,
+    pricingType: (updated as any).pricingType,
+    units: (updated as any).units,
+    price: (updated as any).price,
+    images: updated.images,
+    cityId: updated.cityId,
+    createdAt: updated.createdAt,
+    updatedAt: updated.updatedAt
+  });
+}
+
+export async function deleteProject(projectId: string) {
+  assertValidProjectId(projectId);
+  const deleted = await repo.softDeleteProjectById(new mongoose.Types.ObjectId(projectId));
+  if (!deleted) throw new AppError("Project not found", 404);
 }
 
 function normalizeQuestionType(type: string) {

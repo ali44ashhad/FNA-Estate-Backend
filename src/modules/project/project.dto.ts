@@ -44,6 +44,37 @@ export const createProjectSchema = z.object({
   images: z.array(z.string().min(1)).optional()
 });
 
+export const updateProjectSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    cityId: z
+      .string()
+      .min(1)
+      .refine((val) => mongoose.Types.ObjectId.isValid(val), { message: "Invalid cityId" })
+      .optional(),
+    propertyType: z.enum(["apartment", "plot", "villa"]).optional(),
+    status: z.string().min(1).optional(),
+    pricingType: z.enum(["unit_based", "direct"]).optional(),
+    units: z
+      .array(
+        z.object({
+          type: z.string().min(1),
+          minPrice: z.number().min(0),
+          maxPrice: z.number().min(0),
+          size: z.string().min(1).optional()
+        })
+      )
+      .optional(),
+    price: z
+      .object({
+        min: z.number().min(0),
+        max: z.number().min(0)
+      })
+      .optional(),
+    images: z.array(z.string().min(1)).optional()
+  })
+  .refine((obj) => Object.keys(obj).length > 0, { message: "No fields to update" });
+
 export const filterProjectSchema = z.object({
   cityId: z
     .preprocess(firstQueryValue, z.string().min(1).optional())
@@ -75,10 +106,12 @@ export const recommendProjectsSchema = z.object({
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type FilterProjectInput = z.infer<typeof filterProjectSchema>;
 export type RecommendProjectsInput = z.infer<typeof recommendProjectsSchema>;
 
 export const createProjectRequestSchema = z.object({ body: createProjectSchema });
+export const updateProjectRequestSchema = z.object({ body: updateProjectSchema });
 export const filterProjectRequestSchema = z.object({ query: filterProjectSchema });
 export const recommendProjectsRequestSchema = z.object({ body: recommendProjectsSchema });
 

@@ -28,6 +28,10 @@ export async function createProject(data: CreateProjectData) {
   return Project.create(data);
 }
 
+export async function findProjectRawById(id: Types.ObjectId) {
+  return Project.findOne({ _id: id, isDeleted: false }).lean();
+}
+
 function buildFindQuery(filters: ProjectFilters) {
   const query: Record<string, unknown> = { isDeleted: false };
 
@@ -77,5 +81,19 @@ export async function countProjects(filters: ProjectFilters) {
 
 export async function findProjectById(id: Types.ObjectId) {
   return Project.findOne({ _id: id, isDeleted: false }).populate("cityId", "name state").lean();
+}
+
+export async function updateProjectById(id: Types.ObjectId, data: Partial<CreateProjectData>) {
+  return Project.findOneAndUpdate({ _id: id, isDeleted: false }, data, { new: true })
+    .populate("cityId", "name state")
+    .lean();
+}
+
+export async function softDeleteProjectById(id: Types.ObjectId) {
+  return Project.findOneAndUpdate(
+    { _id: id, isDeleted: false },
+    { isDeleted: true, deletedAt: new Date() },
+    { new: true }
+  ).lean();
 }
 
