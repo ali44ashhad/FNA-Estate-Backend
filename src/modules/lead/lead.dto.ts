@@ -31,7 +31,31 @@ const objectIdString = z
   .refine((val) => mongoose.Types.ObjectId.isValid(val), { message: "Invalid id" });
 
 export const createLeadSchema = z.object({
-  projectId: objectIdString
+  projectId: objectIdString,
+  interest: z
+    .object({
+      category: z.enum(["commercial", "residential"]),
+      subType: z.string().min(1),
+      apartmentConfig: z.string().min(1).optional(),
+      unitTypeKey: z.string().min(1).optional(),
+      unitTypeLabel: z.string().min(1).optional()
+    })
+    .superRefine((interest, ctx) => {
+      if (interest.category === "residential" && interest.subType === "apartment") {
+        if (!interest.apartmentConfig) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "interest.apartmentConfig is required when subType=apartment"
+          });
+        }
+      }
+      if (interest.unitTypeLabel && !interest.unitTypeKey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "interest.unitTypeKey is required when unitTypeLabel is provided"
+        });
+      }
+    })
 });
 
 export const updateLeadSchema = z

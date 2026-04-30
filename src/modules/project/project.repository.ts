@@ -4,18 +4,23 @@ import { Project } from "./project.model";
 export type CreateProjectData = {
   name: string;
   cityId: Types.ObjectId;
-  propertyType: "apartment" | "plot" | "villa";
   status: string;
-  pricingType: "unit_based" | "direct";
+  projectCode: string;
+  categories: ("commercial" | "residential")[];
+  inventory: unknown[];
   amenities?: string[];
   description?: string;
-  units?: { type: string; minPrice: number; maxPrice: number; size?: string }[];
-  price?: { min: number; max: number };
   images: string[];
 };
 
 export type ProjectFilters = {
   cityId?: Types.ObjectId;
+  // New filters
+  category?: "commercial" | "residential";
+  subType?: string;
+  apartmentConfig?: string;
+
+  // Legacy filter (mapped in service for backward compatibility)
   propertyType?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -38,25 +43,93 @@ function buildFindQuery(filters: ProjectFilters) {
   const query: Record<string, unknown> = { isDeleted: false };
 
   if (filters.cityId) query.cityId = filters.cityId;
-  if (filters.propertyType) query.propertyType = filters.propertyType;
+
+  const inventoryElemMatch: Record<string, unknown> = {};
+  if (filters.category) inventoryElemMatch.category = filters.category;
+  if (filters.subType) inventoryElemMatch.subType = filters.subType;
+
+  // apartmentConfig filter applies only to residential/apartment configs
+  if (filters.apartmentConfig) {
+    inventoryElemMatch.category = "residential";
+    inventoryElemMatch.subType = "apartment";
+    inventoryElemMatch.apartmentConfigs = { $elemMatch: { config: filters.apartmentConfig } };
+  }
+
+  if (Object.keys(inventoryElemMatch).length > 0) {
+    query.inventory = { $elemMatch: inventoryElemMatch };
+  }
 
   if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
     const min = typeof filters.minPrice === "number" ? filters.minPrice : 0;
     const max =
       typeof filters.maxPrice === "number" ? filters.maxPrice : Number.MAX_SAFE_INTEGER;
 
+    const apartmentConfig = filters.apartmentConfig;
+
     query.$or = [
       {
-        pricingType: "direct",
-        "price.min": { $lte: max },
-        "price.max": { $gte: min }
+        // Non-apartment direct pricing
+        inventory: {
+          $elemMatch: {
+            ...(filters.category ? { category: filters.category } : {}),
+            ...(filters.subType ? { subType: filters.subType } : {}),
+            pricingType: "direct",
+            "price.min": { $lte: max },
+            "price.max": { $gte: min }
+          }
+        }
       },
       {
-        pricingType: "unit_based",
-        units: {
+        // Non-apartment unit-based pricing
+        inventory: {
           $elemMatch: {
-            minPrice: { $lte: max },
-            maxPrice: { $gte: min }
+            ...(filters.category ? { category: filters.category } : {}),
+            ...(filters.subType ? { subType: filters.subType } : {}),
+            pricingType: "unit_based",
+            units: {
+              $elemMatch: {
+                minPrice: { $lte: max },
+                maxPrice: { $gte: min }
+              }
+            }
+          }
+        }
+      },
+      {
+        // Apartment config direct pricing
+        inventory: {
+          $elemMatch: {
+            category: "residential",
+            subType: "apartment",
+            apartmentConfigs: {
+              $elemMatch: {
+                ...(apartmentConfig ? { config: apartmentConfig } : {}),
+                pricingType: "direct",
+                "price.min": { $lte: max },
+                "price.max": { $gte: min }
+              }
+            }
+          }
+        }
+      },
+      {
+        // Apartment config unit-based pricing
+        inventory: {
+          $elemMatch: {
+            category: "residential",
+            subType: "apartment",
+            apartmentConfigs: {
+              $elemMatch: {
+                ...(apartmentConfig ? { config: apartmentConfig } : {}),
+                pricingType: "unit_based",
+                units: {
+                  $elemMatch: {
+                    minPrice: { $lte: max },
+                    maxPrice: { $gte: min }
+                  }
+                }
+              }
+            }
           }
         }
       }

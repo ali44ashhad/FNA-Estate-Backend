@@ -37,9 +37,38 @@ export const getProjects = async (req: Request, res: Response) => {
   });
 };
 
+export const getAdminProjects = async (req: Request, res: Response) => {
+  const filters = filterProjectSchema.parse(req.query);
+  const { page, limit, skip } = getPagination({ page: filters.page, limit: filters.limit });
+  const { items, total } = await ProjectService.getAdminProjects(filters, { skip, limit });
+
+  res.json({
+    success: true,
+    message: "OK",
+    data: items,
+    meta: {
+      page,
+      limit,
+      total,
+      hasNext: page * limit < total
+    }
+  });
+};
+
 export const getProjectById = async (req: Request, res: Response) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const project = await ProjectService.getProjectById(id);
+
+  res.json({
+    success: true,
+    message: "OK",
+    data: project
+  });
+};
+
+export const getAdminProjectById = async (req: Request, res: Response) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const project = await ProjectService.getAdminProjectById(id);
 
   res.json({
     success: true,

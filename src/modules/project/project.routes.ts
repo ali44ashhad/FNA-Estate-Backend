@@ -22,6 +22,22 @@ router.post(
 
 router.get("/", validate(filterProjectRequestSchema), ProjectController.getProjects);
 router.post("/recommend", validate(recommendProjectsRequestSchema), ProjectController.recommendProjects);
+
+// Admin/employee reads (includes pricing/inventory details)
+router.get(
+  "/admin",
+  authMiddleware,
+  roleMiddleware("admin", "operations", "sales"),
+  validate(filterProjectRequestSchema),
+  ProjectController.getAdminProjects
+);
+router.get(
+  "/admin/:id",
+  authMiddleware,
+  roleMiddleware("admin", "operations", "sales"),
+  ProjectController.getAdminProjectById
+);
+
 router.get("/:id", ProjectController.getProjectById);
 
 router.put(

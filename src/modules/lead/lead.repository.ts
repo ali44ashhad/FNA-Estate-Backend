@@ -22,6 +22,15 @@ export type LeadPageParams = {
 export async function createLead(data: {
   userId: Types.ObjectId;
   projectId: Types.ObjectId;
+  leadNo: number;
+  interest: {
+    category: "commercial" | "residential";
+    subType: string;
+    apartmentConfig?: string;
+    unitTypeKey?: string;
+    unitTypeLabel?: string;
+    inventoryKey: string;
+  };
   status: string;
 }) {
   return Lead.create(data);

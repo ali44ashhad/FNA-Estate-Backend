@@ -143,7 +143,9 @@ describe("project.service recommendProjects", () => {
     expect(ProjectRepo.findProjects).toHaveBeenCalled();
     expect(result[0]?.id).toBe("p1");
     expect(result[0]?.city?.id).toBe(cityId);
-    expect(result[0]?.pricingType).toBe("direct");
+    expect((result[0] as any)?.pricingType).toBeUndefined();
+    expect(result[0]?.inventory?.[0]?.category).toBe("residential");
+    expect(result[0]?.inventory?.[0]?.subType).toBe("villa");
   });
 
   it("derives propertyType filter from propertyType-type question", async () => {
@@ -171,48 +173,41 @@ describe("project.service recommendProjects", () => {
     });
 
     const calls = vi.mocked(ProjectRepo.findProjects).mock.calls;
-    const passedPropertyType = calls.some(
-      (args) => (args[0] as any)?.propertyType === "apartment"
+    const passed = calls.some(
+      (args) => (args[0] as any)?.category === "residential" && (args[0] as any)?.subType === "apartment"
     );
-    expect(passedPropertyType).toBe(true);
+    expect(passed).toBe(true);
   });
 });
 
-describe("project.service createProject pricing validation", () => {
-  it("throws 400 when pricingType=unit_based and units missing", async () => {
+describe("project.service createProject", () => {
+  it("derives categories from inventory", async () => {
     vi.mocked(CityService.assertCityExists).mockResolvedValue(undefined as any);
     const spy = vi.spyOn(ProjectRepo, "createProject").mockResolvedValue({ _id: "p1" } as any);
+    vi.spyOn(ProjectRepo, "findProjectById").mockResolvedValue({
+      _id: "p1",
+      name: "Proj",
+      projectCode: "PRJ-001",
+      status: "active",
+      categories: ["commercial", "residential"],
+      inventory: [],
+      images: [],
+      cityId: null
+    } as any);
 
-    await expect(
-      ProjectService.createProject({
-        name: "Proj",
-        cityId: "507f191e810c19729de860ff",
-        propertyType: "villa",
-        status: "active",
-        pricingType: "unit_based",
-        images: []
-      } as any)
-    ).rejects.toMatchObject({ statusCode: 400 });
+    await ProjectService.createProject({
+      name: "Proj",
+      cityId: "507f191e810c19729de860ff",
+      projectCode: "PRJ-001",
+      status: "active",
+      inventory: [
+        { category: "commercial", subType: "office", pricingType: "direct", price: { min: 10, max: 20 } },
+        { category: "residential", subType: "villa", pricingType: "direct", price: { min: 30, max: 40 } }
+      ],
+      images: []
+    } as any);
 
-    expect(spy).not.toHaveBeenCalled();
-  });
-
-  it("throws 400 when pricingType=direct and price missing", async () => {
-    vi.mocked(CityService.assertCityExists).mockResolvedValue(undefined as any);
-    const spy = vi.spyOn(ProjectRepo, "createProject").mockResolvedValue({ _id: "p1" } as any);
-
-    await expect(
-      ProjectService.createProject({
-        name: "Proj",
-        cityId: "507f191e810c19729de860ff",
-        propertyType: "villa",
-        status: "active",
-        pricingType: "direct",
-        images: []
-      } as any)
-    ).rejects.toMatchObject({ statusCode: 400 });
-
-    expect(spy).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ categories: expect.arrayContaining(["commercial", "residential"]) }));
   });
 });
 
@@ -244,24 +239,12 @@ describe("project.service updateProject/deleteProject", () => {
     _id: projectDocId,
     name: "Proj",
     cityId: projectDocId,
-    propertyType: "villa",
     status: "active",
-    pricingType: "direct",
-    price: { min: 10, max: 20 },
-    units: [],
+    projectCode: "PRJ-001",
+    categories: ["residential"],
+    inventory: [{ category: "residential", subType: "villa", pricingType: "direct", price: { min: 10, max: 20 } }],
     images: []
   };
-
-  it("throws 400 when switching to unit_based without units", async () => {
-    vi.mocked(ProjectRepo.findProjectRawById).mockResolvedValue(baseCurrent as any);
-    vi.mocked(ProjectRepo.updateProjectById).mockResolvedValue(null as any);
-
-    await expect(
-      ProjectService.updateProject(projectId, {
-        pricingType: "unit_based"
-      } as any)
-    ).rejects.toMatchObject({ statusCode: 400 });
-  });
 
   it("validates city when cityId changes", async () => {
     vi.mocked(ProjectRepo.findProjectRawById).mockResolvedValue(baseCurrent as any);
@@ -270,11 +253,10 @@ describe("project.service updateProject/deleteProject", () => {
       _id: projectDocId,
       name: "Proj",
       cityId: { _id: projectDocId, name: "City", state: "ST" },
-      propertyType: "villa",
+      projectCode: "PRJ-001",
       status: "active",
-      pricingType: "direct",
-      price: { min: 10, max: 20 },
-      units: [],
+      categories: ["residential"],
+      inventory: [{ category: "residential", subType: "villa", pricingType: "direct", price: { min: 10, max: 20 } }],
       images: []
     } as any);
 

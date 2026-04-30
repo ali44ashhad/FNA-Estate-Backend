@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as LeadService from "./lead.service";
 import * as repo from "./lead.repository";
 import { Project } from "../project/project.model";
+import * as CounterRepo from "../counter/counter.repository";
 
 vi.mock("./lead.repository", async () => {
   const actual = await vi.importActual<typeof import("./lead.repository")>("./lead.repository");
@@ -30,11 +31,19 @@ vi.mock("../project/project.model", async () => {
   };
 });
 
+vi.mock("../counter/counter.repository", async () => {
+  const actual = await vi.importActual<typeof import("../counter/counter.repository")>("../counter/counter.repository");
+  return { ...actual, nextCounterSeq: vi.fn() };
+});
+
 describe("lead.service", () => {
   it("createLead rejects invalid project id", async () => {
-    await expect(LeadService.createLead("507f191e810c19729de860ea", { projectId: "bad" })).rejects.toMatchObject(
-      { statusCode: 400 }
-    );
+    await expect(
+      LeadService.createLead("507f191e810c19729de860ea", {
+        projectId: "bad",
+        interest: { category: "residential", subType: "villa" }
+      } as any)
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("createLead rejects missing project", async () => {
@@ -42,18 +51,23 @@ describe("lead.service", () => {
 
     await expect(
       LeadService.createLead("507f191e810c19729de860ea", {
-        projectId: "507f191e810c19729de860eb"
+        projectId: "507f191e810c19729de860eb",
+        interest: { category: "residential", subType: "villa" }
       })
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("createLead rejects duplicates", async () => {
     vi.mocked(Project.findOne).mockResolvedValue({ _id: "p1" } as any);
-    vi.mocked(repo.findLeads).mockResolvedValue([{ _id: "l1" }] as any);
+    vi.mocked(repo.findLeads).mockResolvedValue([
+      { _id: "l1", interest: { inventoryKey: "residential/villa", unitTypeKey: "" } }
+    ] as any);
+    vi.mocked(CounterRepo.nextCounterSeq).mockResolvedValue(1 as any);
 
     await expect(
       LeadService.createLead("507f191e810c19729de860ea", {
-        projectId: "507f191e810c19729de860eb"
+        projectId: "507f191e810c19729de860eb",
+        interest: { category: "residential", subType: "villa" }
       })
     ).rejects.toMatchObject({ statusCode: 400 });
   });

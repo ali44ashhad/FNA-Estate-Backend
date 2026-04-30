@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { connectDB } from "../database/db";
-import { Project, ProjectPricingType, ProjectPropertyType } from "../modules/project/project.model";
+import { Project } from "../modules/project/project.model";
 
 dotenv.config();
 
@@ -49,15 +49,106 @@ function makeImageUrls(params: {
 
 type SeedProject = {
   name: string;
-  propertyType: ProjectPropertyType;
-  pricingType: ProjectPricingType;
   status: string;
   images: string[];
   amenities: string[];
   description: string;
+  // New shape (preferred)
+  projectCode?: string;
+  categories?: Array<"commercial" | "residential">;
+  inventory?: any[];
+
+  // Legacy seed shape (supported for convenience)
+  propertyType?: "apartment" | "plot" | "villa";
+  pricingType?: "unit_based" | "direct";
   units?: { type: string; minPrice: number; maxPrice: number; size?: string }[];
   price?: { min: number; max: number };
 };
+
+function slugKey(raw: string) {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 24);
+}
+
+function makeProjectCode(name: string, idx: number) {
+  const parts = name
+    .split(/\s+/g)
+    .map((p) => p.replace(/[^A-Za-z0-9]/g, ""))
+    .filter(Boolean);
+  const prefix = parts.slice(0, 2).map((p) => p.slice(0, 3).toUpperCase()).join("-") || "PRJ";
+  const n = String(idx + 1).padStart(4, "0");
+  return `${prefix}-${n}`;
+}
+
+function legacyToInventory(params: {
+  propertyType: "apartment" | "plot" | "villa";
+  pricingType: "unit_based" | "direct";
+  units?: { type: string; minPrice: number; maxPrice: number; size?: string }[];
+  price?: { min: number; max: number };
+}) {
+  if (params.propertyType === "apartment") {
+    const apartmentConfigs =
+      params.pricingType === "unit_based" && Array.isArray(params.units) && params.units.length > 0
+        ? params.units.map((u) => ({
+            config: slugKey(u.type),
+            configLabel: u.type,
+            pricingType: "direct",
+            price: { min: u.minPrice, max: u.maxPrice }
+          }))
+        : [
+            {
+              config: "standard",
+              configLabel: "Standard",
+              pricingType: "direct",
+              price: { min: params.price?.min ?? 0, max: params.price?.max ?? 0 }
+            }
+          ];
+
+    return [
+      {
+        category: "residential",
+        subType: "apartment",
+        apartmentConfigs
+      }
+    ];
+  }
+
+  const subType = params.propertyType === "villa" ? "villa" : "residential_plot";
+
+  if (params.pricingType === "direct") {
+    return [
+      {
+        category: "residential",
+        subType,
+        pricingType: "direct",
+        price: { min: params.price?.min ?? 0, max: params.price?.max ?? 0 }
+      }
+    ];
+  }
+
+  const units =
+    Array.isArray(params.units) && params.units.length > 0
+      ? params.units.map((u) => ({
+          unitKey: slugKey(u.type),
+          unitLabel: u.type,
+          minPrice: u.minPrice,
+          maxPrice: u.maxPrice,
+          ...(u.size ? { size: u.size } : {})
+        }))
+      : [];
+
+  return [
+    {
+      category: "residential",
+      subType,
+      pricingType: "unit_based",
+      units
+    }
+  ];
+}
 
 function buildSeedProjects(status: string): SeedProject[] {
   const amenitySets = {
@@ -106,13 +197,34 @@ function buildSeedProjects(status: string): SeedProject[] {
       "Storm Water Drains",
       "Parks",
       "Jogging Track"
+    ],
+    commercialCore: [
+      "Security",
+      "CCTV",
+      "Power Backup",
+      "Visitor Parking",
+      "Fire Safety",
+      "Lift",
+      "Common Washrooms"
+    ],
+    commercialPremium: [
+      "Security",
+      "CCTV",
+      "Power Backup",
+      "Visitor Parking",
+      "Fire Safety",
+      "Lift",
+      "Common Washrooms",
+      "Loading / Unloading Bay",
+      "Dedicated Signage Space",
+      "High-speed Internet Ready"
     ]
   } as const;
 
   function makeDescription(params: {
     name: string;
-    propertyType: ProjectPropertyType;
-    pricingType: ProjectPricingType;
+    propertyType: "apartment" | "plot" | "villa";
+    pricingType: "unit_based" | "direct";
     status: string;
     highlights: string[];
   }): string {
@@ -132,12 +244,32 @@ function buildSeedProjects(status: string): SeedProject[] {
     ].join("\n");
   }
 
+  function makeCatalogDescription(params: {
+    name: string;
+    kindLabel: string; // e.g. "commercial", "mixed-use"
+    status: string;
+    highlights: string[];
+  }): string {
+    const safeStatus = params.status ? params.status : "active";
+    const hl = params.highlights
+      .map((h) => h.trim())
+      .filter(Boolean)
+      .map((h) => `<li>${h}</li>`)
+      .join("");
+
+    return [
+      `<p><strong>${params.name}</strong> is a ${params.kindLabel} project planned for strong visibility, smooth access, and future-ready infrastructure.</p>`,
+      `<p><strong>Status:</strong> ${safeStatus}.</p>`,
+      `<h4>Highlights</h4>`,
+      `<ul>${hl}</ul>`,
+      `<p>For site visits, availability, and the latest offers, please get in touch.</p>`
+    ].join("\n");
+  }
+
   const projects: SeedProject[] = [
     // Apartments (unit_based)
     {
       name: "Skyline Heights Residences",
-      propertyType: "apartment",
-      pricingType: "unit_based",
       status,
       amenities: [...amenitySets.apartmentPremium],
       description: makeDescription({
@@ -147,11 +279,17 @@ function buildSeedProjects(status: string): SeedProject[] {
         status,
         highlights: ["Premium clubhouse and pool", "Spacious unit mix with efficient layouts", "Strong security and power backup"]
       }),
-      units: [
+      projectCode: makeProjectCode("Skyline Heights Residences", 0),
+      categories: ["residential"],
+      inventory: legacyToInventory({
+        propertyType: "apartment",
+        pricingType: "unit_based",
+        units: [
         { type: "1BHK", minPrice: 4200000, maxPrice: 5200000, size: "650-750 sq ft" },
         { type: "2BHK", minPrice: 6100000, maxPrice: 8200000, size: "980-1180 sq ft" },
         { type: "3BHK", minPrice: 9100000, maxPrice: 12500000, size: "1350-1600 sq ft" }
-      ],
+        ]
+      }),
       images: makeImageUrls({
         count: 6,
         sigBase: 101
@@ -159,8 +297,6 @@ function buildSeedProjects(status: string): SeedProject[] {
     },
     {
       name: "Urban Nest Towers",
-      propertyType: "apartment",
-      pricingType: "unit_based",
       status,
       amenities: [...amenitySets.apartmentCore],
       description: makeDescription({
@@ -170,11 +306,17 @@ function buildSeedProjects(status: string): SeedProject[] {
         status,
         highlights: ["Compact studios to 2BHK options", "Visitor parking and CCTV coverage", "Fitness and kids’ play area"]
       }),
-      units: [
+      projectCode: makeProjectCode("Urban Nest Towers", 1),
+      categories: ["residential"],
+      inventory: legacyToInventory({
+        propertyType: "apartment",
+        pricingType: "unit_based",
+        units: [
         { type: "Studio", minPrice: 2900000, maxPrice: 3600000, size: "420-520 sq ft" },
         { type: "1BHK", minPrice: 3800000, maxPrice: 4800000, size: "600-720 sq ft" },
         { type: "2BHK", minPrice: 5400000, maxPrice: 6900000, size: "900-1050 sq ft" }
-      ],
+        ]
+      }),
       images: makeImageUrls({
         count: 5,
         sigBase: 111
@@ -182,8 +324,6 @@ function buildSeedProjects(status: string): SeedProject[] {
     },
     {
       name: "Lakeview Grand Apartments",
-      propertyType: "apartment",
-      pricingType: "unit_based",
       status,
       amenities: [...amenitySets.apartmentPremium, "Lake View"],
       description: makeDescription({
@@ -193,10 +333,16 @@ function buildSeedProjects(status: string): SeedProject[] {
         status,
         highlights: ["Lake-view facing homes (select units)", "Premium amenities and indoor games", "Well-connected neighborhood"]
       }),
-      units: [
+      projectCode: makeProjectCode("Lakeview Grand Apartments", 2),
+      categories: ["residential"],
+      inventory: legacyToInventory({
+        propertyType: "apartment",
+        pricingType: "unit_based",
+        units: [
         { type: "2BHK", minPrice: 6800000, maxPrice: 8600000, size: "1020-1220 sq ft" },
         { type: "3BHK", minPrice: 9800000, maxPrice: 13900000, size: "1450-1750 sq ft" }
-      ],
+        ]
+      }),
       images: makeImageUrls({
         count: 5,
         sigBase: 121
@@ -205,8 +351,6 @@ function buildSeedProjects(status: string): SeedProject[] {
     // Apartments (direct)
     {
       name: "Metroline Suites",
-      propertyType: "apartment",
-      pricingType: "direct",
       status,
       amenities: [...amenitySets.apartmentCore, "Near Metro"],
       description: makeDescription({
@@ -216,7 +360,13 @@ function buildSeedProjects(status: string): SeedProject[] {
         status,
         highlights: ["Near metro connectivity", "Secure entry with CCTV", "Direct pricing with transparent range"]
       }),
-      price: { min: 5200000, max: 9800000 },
+      projectCode: makeProjectCode("Metroline Suites", 3),
+      categories: ["residential"],
+      inventory: legacyToInventory({
+        propertyType: "apartment",
+        pricingType: "direct",
+        price: { min: 5200000, max: 9800000 }
+      }),
       images: makeImageUrls({
         count: 5,
         sigBase: 131
@@ -224,8 +374,6 @@ function buildSeedProjects(status: string): SeedProject[] {
     },
     {
       name: "Garden Arcadia Condos",
-      propertyType: "apartment",
-      pricingType: "direct",
       status,
       amenities: [...amenitySets.apartmentPremium, "Landscaped Gardens"],
       description: makeDescription({
@@ -235,7 +383,13 @@ function buildSeedProjects(status: string): SeedProject[] {
         status,
         highlights: ["Landscaped gardens and jogging track", "Pool and gym access", "Family-friendly community spaces"]
       }),
-      price: { min: 6300000, max: 11200000 },
+      projectCode: makeProjectCode("Garden Arcadia Condos", 4),
+      categories: ["residential"],
+      inventory: legacyToInventory({
+        propertyType: "apartment",
+        pricingType: "direct",
+        price: { min: 6300000, max: 11200000 }
+      }),
       images: makeImageUrls({
         count: 6,
         sigBase: 141
@@ -243,8 +397,6 @@ function buildSeedProjects(status: string): SeedProject[] {
     },
     {
       name: "Sunrise Boulevard Homes",
-      propertyType: "apartment",
-      pricingType: "direct",
       status,
       amenities: [...amenitySets.apartmentCore, "Community Hall"],
       description: makeDescription({
@@ -254,7 +406,13 @@ function buildSeedProjects(status: string): SeedProject[] {
         status,
         highlights: ["Community hall for events", "Power backup and security", "Convenient access to daily essentials"]
       }),
-      price: { min: 4700000, max: 8900000 },
+      projectCode: makeProjectCode("Sunrise Boulevard Homes", 5),
+      categories: ["residential"],
+      inventory: legacyToInventory({
+        propertyType: "apartment",
+        pricingType: "direct",
+        price: { min: 4700000, max: 8900000 }
+      }),
       images: makeImageUrls({
         count: 4,
         sigBase: 151
@@ -264,8 +422,6 @@ function buildSeedProjects(status: string): SeedProject[] {
     // Villas (direct)
     {
       name: "Palm Grove Villas",
-      propertyType: "villa",
-      pricingType: "direct",
       status,
       amenities: [...amenitySets.villaPremium],
       description: makeDescription({
@@ -275,7 +431,13 @@ function buildSeedProjects(status: string): SeedProject[] {
         status,
         highlights: ["Premium villa lifestyle with clubhouse", "Private garden spaces", "Pool and gym facilities"]
       }),
-      price: { min: 18500000, max: 32000000 },
+      projectCode: makeProjectCode("Palm Grove Villas", 6),
+      categories: ["residential"],
+      inventory: legacyToInventory({
+        propertyType: "villa",
+        pricingType: "direct",
+        price: { min: 18500000, max: 32000000 }
+      }),
       images: makeImageUrls({
         count: 6,
         sigBase: 201
@@ -548,6 +710,161 @@ function buildSeedProjects(status: string): SeedProject[] {
         count: 5,
         sigBase: 261
       })
+    },
+
+    // Commercial-only + Mixed-use (new inventory shape)
+    {
+      name: "Orion Trade Center",
+      status,
+      projectCode: "ORION-TC-0101",
+      categories: ["commercial"],
+      amenities: [...amenitySets.commercialPremium, "Corner Visibility", "Wide Frontage"],
+      description: makeCatalogDescription({
+        name: "Orion Trade Center",
+        kindLabel: "commercial",
+        status,
+        highlights: [
+          "SCO blocks designed for retail + office flexibility",
+          "Showroom-ready frontages with strong visibility",
+          "Fire safety + power backup with visitor parking"
+        ]
+      }),
+      inventory: [
+        {
+          category: "commercial",
+          subType: "sco",
+          pricingType: "unit_based",
+          units: [
+            { unitKey: "sco_18_22", unitLabel: "SCO 18–22 ft frontage", minPrice: 17500000, maxPrice: 24500000, size: "1100-1600 sq ft" },
+            { unitKey: "sco_24_28", unitLabel: "SCO 24–28 ft frontage", minPrice: 25500000, maxPrice: 35500000, size: "1600-2300 sq ft" }
+          ]
+        },
+        {
+          category: "commercial",
+          subType: "showroom",
+          pricingType: "direct",
+          price: { min: 32000000, max: 68000000 }
+        }
+      ],
+      images: makeImageUrls({
+        count: 6,
+        sigBase: 401
+      })
+    },
+    {
+      name: "Apex Business District",
+      status,
+      projectCode: "APEX-BD-0102",
+      categories: ["commercial"],
+      amenities: [...amenitySets.commercialCore, "Conference Room (Common)", "Cafeteria (Common)"],
+      description: makeCatalogDescription({
+        name: "Apex Business District",
+        kindLabel: "commercial",
+        status,
+        highlights: [
+          "Office spaces in multiple size bands",
+          "Commercial plots suitable for custom builds",
+          "Reliable utilities with security and CCTV"
+        ]
+      }),
+      inventory: [
+        {
+          category: "commercial",
+          subType: "office",
+          pricingType: "unit_based",
+          units: [
+            { unitKey: "office_500_800", unitLabel: "Office 500–800 sq ft", minPrice: 6200000, maxPrice: 9800000, size: "500-800 sq ft" },
+            { unitKey: "office_800_1200", unitLabel: "Office 800–1200 sq ft", minPrice: 9900000, maxPrice: 15800000, size: "800-1200 sq ft" },
+            { unitKey: "office_1200_2000", unitLabel: "Office 1200–2000 sq ft", minPrice: 15900000, maxPrice: 26500000, size: "1200-2000 sq ft" }
+          ]
+        },
+        {
+          category: "commercial",
+          subType: "commercial_plot",
+          pricingType: "unit_based",
+          units: [
+            { unitKey: "plot_1000_2000", unitLabel: "Commercial Plot 1000–2000 sq ft", minPrice: 14500000, maxPrice: 26500000, size: "1000-2000 sq ft" },
+            { unitKey: "plot_2000_4000", unitLabel: "Commercial Plot 2000–4000 sq ft", minPrice: 27500000, maxPrice: 49500000, size: "2000-4000 sq ft" }
+          ]
+        }
+      ],
+      images: makeImageUrls({
+        count: 6,
+        sigBase: 411
+      })
+    },
+    {
+      name: "Crown Gateway (Mixed-use)",
+      status,
+      projectCode: "CROWN-GW-0201",
+      categories: ["commercial", "residential"],
+      amenities: [...amenitySets.apartmentPremium, ...amenitySets.commercialCore, "Retail Plaza", "Co-working Space"],
+      description: makeCatalogDescription({
+        name: "Crown Gateway (Mixed-use)",
+        kindLabel: "mixed-use",
+        status,
+        highlights: [
+          "Office inventory plus premium residential apartments",
+          "Retail plaza and co-working within the campus",
+          "Strong connectivity and visitor-friendly planning"
+        ]
+      }),
+      inventory: [
+        {
+          category: "commercial",
+          subType: "office",
+          pricingType: "direct",
+          price: { min: 8800000, max: 31500000 }
+        },
+        {
+          category: "residential",
+          subType: "apartment",
+          apartmentConfigs: [
+            { config: "1bhk", configLabel: "1BHK", pricingType: "direct", price: { min: 5100000, max: 6800000 } },
+            { config: "2bhk", configLabel: "2BHK", pricingType: "direct", price: { min: 7100000, max: 9800000 } },
+            { config: "3bhk", configLabel: "3BHK", pricingType: "direct", price: { min: 10200000, max: 14800000 } }
+          ]
+        }
+      ],
+      images: makeImageUrls({
+        count: 7,
+        sigBase: 421
+      })
+    },
+    {
+      name: "Meridian Boulevard (Mixed-use)",
+      status,
+      projectCode: "MERID-BLVD-0202",
+      categories: ["commercial", "residential"],
+      amenities: [...amenitySets.villaPremium, ...amenitySets.commercialPremium, "High Street Retail", "Dedicated Entry Lanes"],
+      description: makeCatalogDescription({
+        name: "Meridian Boulevard (Mixed-use)",
+        kindLabel: "mixed-use",
+        status,
+        highlights: [
+          "SCO high-street frontage plus premium villa living",
+          "Dedicated entry lanes for smoother traffic movement",
+          "Security, CCTV, power backup, and fire safety"
+        ]
+      }),
+      inventory: [
+        {
+          category: "commercial",
+          subType: "sco",
+          pricingType: "direct",
+          price: { min: 19800000, max: 52000000 }
+        },
+        {
+          category: "residential",
+          subType: "villa",
+          pricingType: "direct",
+          price: { min: 22500000, max: 40500000 }
+        }
+      ],
+      images: makeImageUrls({
+        count: 6,
+        sigBase: 431
+      })
     }
   ];
 
@@ -581,6 +898,19 @@ async function main() {
     const p = seedProjects[i];
     const cityId = cityIds[i % cityIds.length];
 
+    const projectCode = p.projectCode ?? makeProjectCode(p.name, i);
+    const inventory =
+      p.inventory ??
+      legacyToInventory({
+        propertyType: (p.propertyType ?? "apartment") as any,
+        pricingType: (p.pricingType ?? "direct") as any,
+        units: p.units,
+        price: p.price
+      });
+    const categories =
+      p.categories ??
+      [...new Set(inventory.map((it: any) => it?.category).filter((c: any) => c === "commercial" || c === "residential"))];
+
     const existing = await Project.findOne({
       name: p.name,
       cityId,
@@ -588,15 +918,14 @@ async function main() {
     });
 
     if (existing) {
-      const nextDoc: Partial<SeedProject> = {
-        propertyType: p.propertyType,
-        pricingType: p.pricingType,
+      const nextDoc: Record<string, unknown> = {
         status: p.status,
+        projectCode,
+        categories,
+        inventory,
         images: p.images,
         amenities: p.amenities,
-        description: p.description,
-        ...(p.units ? { units: p.units } : {}),
-        ...(p.price ? { price: p.price } : {})
+        description: p.description
       };
 
       await Project.updateOne({ _id: existing._id }, { $set: nextDoc });
@@ -607,13 +936,12 @@ async function main() {
     const created = await Project.create({
       name: p.name,
       cityId,
-      propertyType: p.propertyType,
       status: p.status,
-      pricingType: p.pricingType,
+      projectCode,
+      categories,
+      inventory,
       amenities: p.amenities,
       description: p.description,
-      ...(p.units ? { units: p.units } : {}),
-      ...(p.price ? { price: p.price } : {}),
       images: p.images
     });
 

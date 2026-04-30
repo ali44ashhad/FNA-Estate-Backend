@@ -11,8 +11,7 @@ vi.mock("./purchase.repository", async () => {
   return {
     ...actual,
     createPurchase: vi.fn(),
-    findPurchasesByUser: vi.fn(),
-    findActivePurchaseByUserAndProject: vi.fn()
+    findPurchasesByUser: vi.fn()
   };
 });
 
@@ -57,41 +56,30 @@ describe("purchase.service", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it("createPurchase rejects duplicate purchase for project", async () => {
-    vi.mocked(Lead.findOne).mockResolvedValue({
-      _id: "l1",
-      userId: "507f191e810c19729de860ea",
-      projectId: "507f191e810c19729de860ec"
-    } as any);
-
-    vi.mocked(PurchaseRepo.findActivePurchaseByUserAndProject).mockResolvedValue({ _id: "p1" } as any);
-
-    await expect(
-      PurchaseService.createPurchase({
-        leadId: "507f191e810c19729de860eb",
-        amount: 123
-      } as any)
-    ).rejects.toMatchObject({ statusCode: 400 });
-  });
-
   it("createPurchase creates purchase and closes lead", async () => {
     const now = new Date("2020-01-01");
 
     vi.mocked(Lead.findOne).mockResolvedValue({
       _id: "507f191e810c19729de860eb",
       userId: "507f191e810c19729de860ea",
-      projectId: "507f191e810c19729de860ec"
+      projectId: "507f191e810c19729de860ec",
+      interest: {
+        category: "residential",
+        subType: "villa",
+        inventoryKey: "residential/villa"
+      }
     } as any);
-
-    vi.mocked(PurchaseRepo.findActivePurchaseByUserAndProject).mockResolvedValue(null as any);
 
     vi.mocked(PurchaseRepo.createPurchase).mockResolvedValue({
       _id: "p1",
       userId: "507f191e810c19729de860ea",
       projectId: "507f191e810c19729de860ec",
       leadId: "507f191e810c19729de860eb",
-      amount: 123,
-      status: "completed",
+      category: "residential",
+      subType: "villa",
+      inventoryKey: "residential/villa",
+      agreedPrice: 123,
+      status: "booked",
       createdAt: now,
       updatedAt: now
     } as any);
@@ -104,7 +92,8 @@ describe("purchase.service", () => {
     } as any);
 
     expect(result.id).toBe("p1");
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("booked");
+    expect(result.inventoryKey).toBe("residential/villa");
     expect(LeadRepo.updateLeadById).toHaveBeenCalled();
   });
 });
