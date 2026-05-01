@@ -32,6 +32,10 @@ const objectIdString = z
 
 export const createLeadSchema = z.object({
   projectId: objectIdString,
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\d{10}$/, { message: "phone must be exactly 10 digits" }),
   interest: z
     .object({
       category: z.enum(["commercial", "residential"]),

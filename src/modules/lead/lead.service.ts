@@ -10,7 +10,10 @@ type PublicLead = {
   id: string;
   leadNo?: number;
   userId: string;
+  user?: { id: string; name: string; email: string } | null;
   projectId: string;
+  project?: { id: string; name: string; projectCode?: string } | null;
+  phone?: string;
   status: string;
   interest?: {
     category: "commercial" | "residential";
@@ -37,6 +40,7 @@ function sanitizeLead(lead: {
   leadNo?: unknown;
   userId: unknown;
   projectId: unknown;
+  phone?: unknown;
   status: string;
   interest?: unknown;
   assignedOpsId?: unknown;
@@ -44,6 +48,31 @@ function sanitizeLead(lead: {
   createdAt?: Date;
   updatedAt?: Date;
 }): PublicLead {
+  const userObj =
+    lead.userId && typeof lead.userId === "object" && lead.userId !== null
+      ? (lead.userId as Record<string, unknown>)
+      : null;
+  const user =
+    userObj && userObj._id && typeof userObj.name === "string" && typeof userObj.email === "string"
+      ? { id: String(userObj._id), name: userObj.name, email: userObj.email }
+      : null;
+
+  const projectObj =
+    lead.projectId && typeof lead.projectId === "object" && lead.projectId !== null
+      ? (lead.projectId as Record<string, unknown>)
+      : null;
+  const project =
+    projectObj && projectObj._id && typeof projectObj.name === "string"
+      ? {
+          id: String(projectObj._id),
+          name: projectObj.name,
+          projectCode: typeof projectObj.projectCode === "string" ? projectObj.projectCode : undefined
+        }
+      : null;
+
+  const userIdValue = user ? user.id : String(lead.userId);
+  const projectIdValue = project ? project.id : String(lead.projectId);
+
   const interestObj =
     lead.interest && typeof lead.interest === "object" && lead.interest !== null
       ? (lead.interest as Record<string, unknown>)
@@ -59,8 +88,11 @@ function sanitizeLead(lead: {
   return {
     id: String(lead._id),
     leadNo: typeof lead.leadNo === "number" ? lead.leadNo : undefined,
-    userId: String(lead.userId),
-    projectId: String(lead.projectId),
+    userId: userIdValue,
+    user,
+    projectId: projectIdValue,
+    project,
+    phone: typeof lead.phone === "string" ? lead.phone : undefined,
     status: lead.status,
     interest:
       category && subType && inventoryKey
@@ -124,6 +156,7 @@ export async function createLead(userId: string, input: CreateLeadInput) {
   const created = await repo.createLead({
     userId: new mongoose.Types.ObjectId(userId),
     projectId: new mongoose.Types.ObjectId(input.projectId),
+    phone: input.phone,
     leadNo,
     interest: {
       category: input.interest.category,
@@ -141,6 +174,7 @@ export async function createLead(userId: string, input: CreateLeadInput) {
     leadNo: (created as any).leadNo,
     userId: created.userId,
     projectId: created.projectId,
+    phone: (created as any).phone,
     status: created.status,
     interest: (created as any).interest,
     assignedOpsId: created.assignedOpsId,
@@ -178,6 +212,7 @@ export async function getLeads(input: ListLeadInput) {
         leadNo: (l as any).leadNo,
         userId: l.userId,
         projectId: l.projectId,
+        phone: (l as any).phone,
         status: l.status,
         interest: (l as any).interest,
         assignedOpsId: l.assignedOpsId,
@@ -207,6 +242,7 @@ export async function getLeadById(requestingUser: { id: string; role: string }, 
     leadNo: (lead as any).leadNo,
     userId: lead.userId,
     projectId: lead.projectId,
+    phone: (lead as any).phone,
     status: lead.status,
     interest: (lead as any).interest,
     assignedOpsId: lead.assignedOpsId,
@@ -236,6 +272,7 @@ export async function updateLead(leadId: string, input: UpdateLeadInput) {
     leadNo: (updated as any).leadNo,
     userId: updated.userId,
     projectId: updated.projectId,
+    phone: (updated as any).phone,
     status: updated.status,
     interest: (updated as any).interest,
     assignedOpsId: updated.assignedOpsId,

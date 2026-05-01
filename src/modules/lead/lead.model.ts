@@ -7,6 +7,7 @@ import {
 export interface ILead extends Document {
   userId: mongoose.Types.ObjectId;
   projectId: mongoose.Types.ObjectId;
+  phone: string;
   leadNo?: number;
   interest?: {
     category: "commercial" | "residential";
@@ -29,6 +30,7 @@ const leadSchema = new Schema<ILead>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User" },
     projectId: { type: Schema.Types.ObjectId, ref: "Project" },
+    phone: { type: String, required: true, trim: true },
 
     // Sparse for rollout; new creates should always set this.
     leadNo: { type: Number, min: 1 },

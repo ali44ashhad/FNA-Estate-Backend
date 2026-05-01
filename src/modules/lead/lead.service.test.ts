@@ -41,6 +41,7 @@ describe("lead.service", () => {
     await expect(
       LeadService.createLead("507f191e810c19729de860ea", {
         projectId: "bad",
+        phone: "9876543210",
         interest: { category: "residential", subType: "villa" }
       } as any)
     ).rejects.toMatchObject({ statusCode: 400 });
@@ -52,6 +53,7 @@ describe("lead.service", () => {
     await expect(
       LeadService.createLead("507f191e810c19729de860ea", {
         projectId: "507f191e810c19729de860eb",
+        phone: "9876543210",
         interest: { category: "residential", subType: "villa" }
       })
     ).rejects.toMatchObject({ statusCode: 400 });
@@ -67,6 +69,7 @@ describe("lead.service", () => {
     await expect(
       LeadService.createLead("507f191e810c19729de860ea", {
         projectId: "507f191e810c19729de860eb",
+        phone: "9876543210",
         interest: { category: "residential", subType: "villa" }
       })
     ).rejects.toMatchObject({ statusCode: 400 });

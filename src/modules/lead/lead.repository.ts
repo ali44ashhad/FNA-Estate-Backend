@@ -22,6 +22,7 @@ export type LeadPageParams = {
 export async function createLead(data: {
   userId: Types.ObjectId;
   projectId: Types.ObjectId;
+  phone: string;
   leadNo: number;
   interest: {
     category: "commercial" | "residential";
@@ -37,11 +38,15 @@ export async function createLead(data: {
 }
 
 export async function findLeadById(id: Types.ObjectId) {
-  return Lead.findOne({ _id: id, isDeleted: false });
+  return Lead.findOne({ _id: id, isDeleted: false })
+    .populate("userId", "name email")
+    .populate("projectId", "name projectCode");
 }
 
 export async function updateLeadById(id: Types.ObjectId, data: Partial<LeadFilters> & { status?: string }) {
-  return Lead.findOneAndUpdate({ _id: id, isDeleted: false }, data, { new: true });
+  return Lead.findOneAndUpdate({ _id: id, isDeleted: false }, data, { new: true })
+    .populate("userId", "name email")
+    .populate("projectId", "name projectCode");
 }
 
 export async function findLeads(filters: LeadFilters) {
@@ -61,7 +66,9 @@ export async function findLeadsPaged(params: {
     Lead.find(query)
       .sort({ [params.sort.sortBy]: sortDir })
       .skip(skip)
-      .limit(params.page.limit),
+      .limit(params.page.limit)
+      .populate("userId", "name email")
+      .populate("projectId", "name projectCode"),
     Lead.countDocuments(query)
   ]);
 
