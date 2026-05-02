@@ -22,8 +22,15 @@ async function assertLeadExists(leadId: string) {
   return lead;
 }
 
+function assertSalesAssignedToLead(user: RequestingUser, lead: { assignedSalesId?: unknown }) {
+  assertValidObjectId(user.id, "user id");
+  if (!lead.assignedSalesId || String(lead.assignedSalesId) !== user.id) {
+    throw new AppError("Forbidden", 403);
+  }
+}
+
 export async function addNote(user: RequestingUser, input: CreateNoteInput) {
-  await assertLeadExists(input.leadId);
+  const lead = await assertLeadExists(input.leadId);
 
   if (user.role === "operations") {
     assertValidObjectId(user.id, "user id");
@@ -35,7 +42,7 @@ export async function addNote(user: RequestingUser, input: CreateNoteInput) {
   }
 
   if (user.role === "sales") {
-    assertValidObjectId(user.id, "user id");
+    assertSalesAssignedToLead(user, lead);
     return repo.createSalesNote({
       leadId: new mongoose.Types.ObjectId(input.leadId),
       salesId: new mongoose.Types.ObjectId(user.id),
@@ -47,8 +54,14 @@ export async function addNote(user: RequestingUser, input: CreateNoteInput) {
 }
 
 export async function getNotesByLead(user: RequestingUser, leadId: string) {
-  await assertLeadExists(leadId);
+  const lead = await assertLeadExists(leadId);
   const leadObjectId = new mongoose.Types.ObjectId(leadId);
+
+  if (user.role === "sales") {
+    assertSalesAssignedToLead(user, lead);
+    const salesNotes = await repo.getSalesNotesByLead(leadObjectId);
+    return { opsNotes: [], salesNotes };
+  }
 
   if (user.role === "admin") {
     const [opsNotes, salesNotes] = await Promise.all([
@@ -62,11 +75,6 @@ export async function getNotesByLead(user: RequestingUser, leadId: string) {
   if (user.role === "operations") {
     const opsNotes = await repo.getOpsNotesByLead(leadObjectId);
     return { opsNotes, salesNotes: [] };
-  }
-
-  if (user.role === "sales") {
-    const salesNotes = await repo.getSalesNotesByLead(leadObjectId);
-    return { opsNotes: [], salesNotes };
   }
 
   throw new AppError("Forbidden", 403);

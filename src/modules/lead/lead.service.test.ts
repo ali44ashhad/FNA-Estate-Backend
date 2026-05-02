@@ -90,12 +90,15 @@ describe("lead.service", () => {
       total: 1
     } as any);
 
-    const result = await LeadService.getLeads({
-      page: 2,
-      limit: 10,
-      sortBy: "createdAt",
-      sortOrder: "desc"
-    } as any);
+    const result = await LeadService.getLeads(
+      {
+        page: 2,
+        limit: 10,
+        sortBy: "createdAt",
+        sortOrder: "desc"
+      } as any,
+      { id: "507f191e810c19729de860ea", role: "admin" }
+    );
 
     expect(repo.findLeadsPaged).toHaveBeenCalled();
     expect(result.total).toBe(1);
@@ -108,8 +111,39 @@ describe("lead.service", () => {
     vi.mocked(repo.updateLeadById).mockResolvedValue(null as any);
 
     await expect(
-      LeadService.updateLead("507f191e810c19729de860ea", { status: "visited" } as any)
+      LeadService.updateLead("507f191e810c19729de860ea", { status: "visited" } as any, {
+        id: "507f191e810c19729de860ea",
+        role: "admin"
+      })
     ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("getLeads for sales forces assignedSalesId filter", async () => {
+    vi.mocked(repo.findLeadsPaged).mockResolvedValue({ items: [], total: 0 } as any);
+
+    const salesId = "507f191e810c19729de860ea";
+    await LeadService.getLeads(
+      {
+        page: 1,
+        limit: 20,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+        assignedSalesId: "507f191e810c19729de860eb"
+      } as any,
+      { id: salesId, role: "sales" }
+    );
+
+    expect(repo.findLeadsPaged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: expect.objectContaining({
+          assignedSalesId: expect.any(Object)
+        })
+      })
+    );
+    const lastCall = vi.mocked(repo.findLeadsPaged).mock.calls.at(-1)?.[0];
+    expect(String((lastCall?.filters as { assignedSalesId?: { toString: () => string } }).assignedSalesId)).toBe(
+      salesId
+    );
   });
 });
 

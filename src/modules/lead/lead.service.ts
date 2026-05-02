@@ -184,17 +184,25 @@ export async function createLead(userId: string, input: CreateLeadInput) {
   });
 }
 
-export async function getLeads(input: ListLeadInput) {
+type RequestingEmployee = { id: string; role: string };
+
+export async function getLeads(input: ListLeadInput, user: RequestingEmployee) {
   const filters: repo.LeadFilters = {};
 
   if (typeof input.status === "string") filters.status = input.status;
   if (typeof input.userId === "string") filters.userId = new mongoose.Types.ObjectId(input.userId);
   if (typeof input.projectId === "string")
     filters.projectId = new mongoose.Types.ObjectId(input.projectId);
-  if (typeof input.assignedOpsId === "string")
-    filters.assignedOpsId = new mongoose.Types.ObjectId(input.assignedOpsId);
-  if (typeof input.assignedSalesId === "string")
-    filters.assignedSalesId = new mongoose.Types.ObjectId(input.assignedSalesId);
+
+  if (user.role === "sales") {
+    assertValidObjectId(user.id, "user id");
+    filters.assignedSalesId = new mongoose.Types.ObjectId(user.id);
+  } else {
+    if (typeof input.assignedOpsId === "string")
+      filters.assignedOpsId = new mongoose.Types.ObjectId(input.assignedOpsId);
+    if (typeof input.assignedSalesId === "string")
+      filters.assignedSalesId = new mongoose.Types.ObjectId(input.assignedSalesId);
+  }
 
   const limit = Math.min(input.limit, 100);
   const page = input.page;
@@ -235,7 +243,11 @@ export async function getLeadById(requestingUser: { id: string; role: string }, 
 
   const canViewAll = requestingUser.role === "admin" || requestingUser.role === "operations";
   const isOwner = String(lead.userId) === requestingUser.id;
-  if (!canViewAll && !isOwner) throw new AppError("Forbidden", 403);
+  const isAssignedSales =
+    requestingUser.role === "sales" &&
+    lead.assignedSalesId &&
+    String(lead.assignedSalesId) === requestingUser.id;
+  if (!canViewAll && !isOwner && !isAssignedSales) throw new AppError("Forbidden", 403);
 
   return sanitizeLead({
     _id: lead._id,
@@ -252,8 +264,35 @@ export async function getLeadById(requestingUser: { id: string; role: string }, 
   });
 }
 
-export async function updateLead(leadId: string, input: UpdateLeadInput) {
+export async function updateLead(leadId: string, input: UpdateLeadInput, user: RequestingEmployee) {
   assertValidObjectId(leadId, "lead id");
+
+  if (user.role === "sales") {
+    const lead = await repo.findLeadById(new mongoose.Types.ObjectId(leadId));
+    if (!lead) throw new AppError("Lead not found", 404);
+    if (!lead.assignedSalesId || String(lead.assignedSalesId) !== user.id) {
+      throw new AppError("Forbidden", 403);
+    }
+    if (typeof input.status !== "string") {
+      throw new AppError("Sales may only update lead status", 400);
+    }
+    const updated = await repo.updateLeadById(new mongoose.Types.ObjectId(leadId), { status: input.status });
+    if (!updated) throw new AppError("Lead not found", 404);
+
+    return sanitizeLead({
+      _id: updated._id,
+      leadNo: (updated as any).leadNo,
+      userId: updated.userId,
+      projectId: updated.projectId,
+      phone: (updated as any).phone,
+      status: updated.status,
+      interest: (updated as any).interest,
+      assignedOpsId: updated.assignedOpsId,
+      assignedSalesId: updated.assignedSalesId,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt
+    });
+  }
 
   const update: { status?: string; assignedOpsId?: mongoose.Types.ObjectId; assignedSalesId?: mongoose.Types.ObjectId } =
     {};

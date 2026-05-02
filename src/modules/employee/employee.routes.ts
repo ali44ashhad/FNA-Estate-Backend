@@ -17,5 +17,13 @@ router.get(
   EmployeeController.getEmployees
 );
 
+router.get(
+  "/lookup",
+  authMiddleware,
+  roleMiddleware("admin", "operations", "sales"),
+  validate(filterEmployeesRequestSchema),
+  EmployeeController.getEmployeeLookup
+);
+
 export default router;
 

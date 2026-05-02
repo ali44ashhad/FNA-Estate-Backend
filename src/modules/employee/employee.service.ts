@@ -17,6 +17,12 @@ type PublicEmployee = {
   updatedAt?: Date;
 };
 
+type PublicEmployeeLookup = {
+  id: string;
+  name: string;
+  role: "admin" | "operations" | "sales";
+};
+
 function sanitizeEmployee(employee: {
   _id: unknown;
   name: string;
@@ -34,6 +40,18 @@ function sanitizeEmployee(employee: {
     cityId: employee.cityId ? String(employee.cityId) : undefined,
     createdAt: employee.createdAt,
     updatedAt: employee.updatedAt
+  };
+}
+
+function sanitizeEmployeeLookup(employee: {
+  _id: unknown;
+  name: string;
+  role: "admin" | "operations" | "sales";
+}): PublicEmployeeLookup {
+  return {
+    id: String(employee._id),
+    name: employee.name,
+    role: employee.role
   };
 }
 
@@ -103,6 +121,47 @@ export async function getEmployeesPaged(
       cityId: e.cityId,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt
+    })
+  );
+
+  return { items, total };
+}
+
+export async function getEmployeesLookup() {
+  const employees = await repo.getAllEmployees();
+  return employees.map((e) =>
+    sanitizeEmployeeLookup({
+      _id: e._id,
+      name: e.name,
+      role: e.role
+    })
+  );
+}
+
+export async function getEmployeesLookupPaged(
+  filters: FilterEmployeesInput,
+  pagination: { skip: number; limit: number }
+) {
+  const repoFilters: repo.EmployeeFilters = {};
+
+  if (typeof filters.role === "string") {
+    repoFilters.role = filters.role as any;
+  }
+
+  if (typeof filters.q === "string") {
+    repoFilters.q = filters.q.trim();
+  }
+
+  const [employees, total] = await Promise.all([
+    repo.findEmployees(repoFilters, pagination),
+    repo.countEmployees(repoFilters)
+  ]);
+
+  const items = employees.map((e) =>
+    sanitizeEmployeeLookup({
+      _id: e._id,
+      name: e.name,
+      role: e.role
     })
   );
 

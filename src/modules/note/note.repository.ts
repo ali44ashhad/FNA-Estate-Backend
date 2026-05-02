@@ -11,10 +11,10 @@ export async function createSalesNote(data: { leadId: Types.ObjectId; salesId: T
 }
 
 export async function getOpsNotesByLead(leadId: Types.ObjectId) {
-  return OpsNote.find({ leadId, isDeleted: false });
+  return OpsNote.find({ leadId, isDeleted: false }).sort({ createdAt: -1 });
 }
 
 export async function getSalesNotesByLead(leadId: Types.ObjectId) {
-  return SalesNote.find({ leadId, isDeleted: false });
+  return SalesNote.find({ leadId, isDeleted: false }).sort({ createdAt: -1 });
 }
 

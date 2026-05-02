@@ -8,11 +8,11 @@ const router = Router();
 // User creates lead
 router.post("/", authMiddleware, LeadController.createLead);
 
-// Admin / Ops view leads (with filters + pagination)
-router.get("/", authMiddleware, roleMiddleware("admin", "operations"), LeadController.getLeads);
+// Admin / Ops / Sales view leads (sales scoped to assignedSalesId in service)
+router.get("/", authMiddleware, roleMiddleware("admin", "operations", "sales"), LeadController.getLeads);
 
-// Admin / Ops update lead
-router.put("/:id", authMiddleware, roleMiddleware("admin", "operations"), LeadController.updateLead);
+// Admin / Ops / Sales update lead (sales: status only, assigned lead)
+router.put("/:id", authMiddleware, roleMiddleware("admin", "operations", "sales"), LeadController.updateLead);
 
 // Get single lead (owner or admin/ops)
 router.get("/:id", authMiddleware, LeadController.getLeadById);

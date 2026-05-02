@@ -15,7 +15,7 @@ export const createLead = async (req: Request, res: Response) => {
 
 export const getLeads = async (req: Request, res: Response) => {
   const input = listLeadSchema.parse(req.query);
-  const result = await LeadService.getLeads(input);
+  const result = await LeadService.getLeads(input, req.user!);
 
   res.json({
     success: true,
@@ -38,7 +38,7 @@ export const getLeadById = async (req: Request, res: Response) => {
 export const updateLead = async (req: Request, res: Response) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const input = updateLeadSchema.parse(req.body);
-  const lead = await LeadService.updateLead(id, input);
+  const lead = await LeadService.updateLead(id, input, req.user!);
 
   res.json({
     success: true,
