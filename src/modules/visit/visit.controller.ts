@@ -1,6 +1,11 @@
 import type { Request, Response } from "express";
 import { AppError } from "../../shared/errors/AppError";
-import { createVisitSchema, updateVisitSchema, updateVisitStatusSchema } from "./visit.dto";
+import {
+  createVisitSchema,
+  listVisitSchema,
+  updateVisitSchema,
+  updateVisitStatusSchema
+} from "./visit.dto";
 import * as VisitService from "./visit.service";
 
 export const createVisit = async (req: Request, res: Response) => {
@@ -31,7 +36,7 @@ export const updateVisit = async (req: Request, res: Response) => {
 
   if (role === "sales") {
     const input = updateVisitStatusSchema.parse(req.body);
-    const visit = await VisitService.updateVisitStatusAsSales(id, input);
+    const visit = await VisitService.updateVisitStatusAsSales(id, input, req.user!);
 
     return res.json({
       success: true,
@@ -43,9 +48,20 @@ export const updateVisit = async (req: Request, res: Response) => {
   throw new AppError("Forbidden", 403);
 };
 
+export const listVisits = async (req: Request, res: Response) => {
+  const input = listVisitSchema.parse(req.query);
+  const result = await VisitService.listVisits(input, req.user!);
+
+  res.json({
+    success: true,
+    message: "OK",
+    data: result
+  });
+};
+
 export const getVisitById = async (req: Request, res: Response) => {
   const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const visit = await VisitService.getVisitById(id);
+  const visit = await VisitService.getVisitById(id, req.user!);
 
   res.json({
     success: true,

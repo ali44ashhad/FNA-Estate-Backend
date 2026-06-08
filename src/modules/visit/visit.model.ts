@@ -13,6 +13,7 @@ export interface IVisit extends Document {
   visitTime: Date;
   status: VisitStatus;
   location: string;
+  locationLink?: string;
   isDeleted?: boolean;
   deletedAt?: Date | null;
   createdAt?: Date;
@@ -26,6 +27,7 @@ const visitSchema = new Schema<IVisit>(
     visitTime: { type: Date, required: true },
     status: { type: String, enum: VISIT_STATUSES, required: true },
     location: { type: String, required: true, trim: true },
+    locationLink: { type: String, trim: true },
 
     ...baseSchemaFields
   },

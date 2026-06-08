@@ -8,6 +8,12 @@ const router = Router();
 // Admin / Ops records purchase
 router.post("/", authMiddleware, roleMiddleware("admin", "operations"), PurchaseController.createPurchase);
 
+// Admin / Ops list purchases
+router.get("/", authMiddleware, roleMiddleware("admin", "operations"), PurchaseController.listPurchases);
+
+// Admin / Ops update purchase status
+router.put("/:id", authMiddleware, roleMiddleware("admin", "operations"), PurchaseController.updatePurchaseStatus);
+
 // User views own purchases
 router.get("/me", authMiddleware, PurchaseController.getMyPurchases);
 
