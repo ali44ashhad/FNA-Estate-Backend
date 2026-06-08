@@ -72,16 +72,24 @@ export const updateLeadSchema = z
 
 export const listLeadSchema = z.object({
   status: z.preprocess(firstQueryValue, z.enum(LEAD_STATUSES).optional()),
-  userId: z
-    .preprocess(firstQueryValue, z.string().min(1).optional())
-    .refine((val) => val === undefined || mongoose.Types.ObjectId.isValid(val), {
-      message: "Invalid userId"
-    }),
-  projectId: z
-    .preprocess(firstQueryValue, z.string().min(1).optional())
-    .refine((val) => val === undefined || mongoose.Types.ObjectId.isValid(val), {
-      message: "Invalid projectId"
-    }),
+  userId: z.preprocess(
+    (val) => {
+      const raw = firstQueryValue(val);
+      if (raw === undefined || raw === null || raw === "") return undefined;
+      const s = String(raw).trim();
+      return s.length ? s : undefined;
+    },
+    z.string().min(1).optional()
+  ),
+  projectId: z.preprocess(
+    (val) => {
+      const raw = firstQueryValue(val);
+      if (raw === undefined || raw === null || raw === "") return undefined;
+      const s = String(raw).trim();
+      return s.length ? s : undefined;
+    },
+    z.string().min(1).optional()
+  ),
   assignedOpsId: z
     .preprocess(firstQueryValue, z.string().min(1).optional())
     .refine((val) => val === undefined || mongoose.Types.ObjectId.isValid(val), {

@@ -74,8 +74,21 @@ describe("visit.service", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
+  it("createVisit rejects lead that is not contacted", async () => {
+    vi.mocked(Lead.findOne).mockResolvedValue({ _id: "l1", status: "new" } as any);
+
+    await expect(
+      VisitService.createVisit({
+        leadId: "507f191e810c19729de860eb",
+        salesId: "507f191e810c19729de860ea",
+        visitTime: new Date(),
+        location: "Loc"
+      } as any)
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
   it("createVisit rejects duplicate visit for lead", async () => {
-    vi.mocked(Lead.findOne).mockResolvedValue({ _id: "l1" } as any);
+    vi.mocked(Lead.findOne).mockResolvedValue({ _id: "l1", status: "contacted" } as any);
     vi.mocked(VisitRepo.findVisitByLeadId).mockResolvedValue({ _id: "v1" } as any);
 
     await expect(
@@ -89,7 +102,7 @@ describe("visit.service", () => {
   });
 
   it("createVisit rejects non-sales employee", async () => {
-    vi.mocked(Lead.findOne).mockResolvedValue({ _id: "l1" } as any);
+    vi.mocked(Lead.findOne).mockResolvedValue({ _id: "l1", status: "contacted" } as any);
     vi.mocked(VisitRepo.findVisitByLeadId).mockResolvedValue(null as any);
     vi.mocked(Employee.findOne).mockResolvedValue({ _id: "e1", role: "operations" } as any);
 
@@ -106,7 +119,7 @@ describe("visit.service", () => {
   it("createVisit schedules visit and updates lead", async () => {
     const now = new Date("2020-01-01");
 
-    vi.mocked(Lead.findOne).mockResolvedValue({ _id: "l1" } as any);
+    vi.mocked(Lead.findOne).mockResolvedValue({ _id: "l1", status: "contacted" } as any);
     vi.mocked(VisitRepo.findVisitByLeadId).mockResolvedValue(null as any);
     vi.mocked(Employee.findOne).mockResolvedValue({ _id: "e1", role: "sales" } as any);
 

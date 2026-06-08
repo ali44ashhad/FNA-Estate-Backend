@@ -172,3 +172,26 @@ export async function softDeleteProjectById(id: Types.ObjectId) {
   ).lean();
 }
 
+const PROJECT_SEARCH_MAX = 200;
+
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Projects whose name or projectCode contains `q` (case-insensitive). Capped for safe `$in` on leads. */
+export async function findProjectIdsMatchingNameOrCode(q: string): Promise<Types.ObjectId[]> {
+  const trimmed = q.trim();
+  if (!trimmed) return [];
+
+  const re = new RegExp(escapeRegex(trimmed), "i");
+  const rows = await Project.find({
+    isDeleted: false,
+    $or: [{ name: re }, { projectCode: re }]
+  })
+    .select("_id")
+    .limit(PROJECT_SEARCH_MAX)
+    .lean();
+
+  return rows.map((r) => r._id as Types.ObjectId);
+}
+

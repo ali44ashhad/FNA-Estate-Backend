@@ -1,4 +1,6 @@
 import type { Request, Response } from "express";
+import { listMyVisitsSchema } from "../visit/visit.dto";
+import * as VisitService from "../visit/visit.service";
 import { updateUserSchema } from "./user.dto";
 import * as UserService from "./user.service";
 
@@ -9,6 +11,17 @@ export const getProfile = async (req: Request, res: Response) => {
     success: true,
     message: "OK",
     data: user
+  });
+};
+
+export const getMyVisits = async (req: Request, res: Response) => {
+  const input = listMyVisitsSchema.parse(req.query);
+  const data = await VisitService.listVisitsForCustomer(req.user!.id, input);
+
+  res.json({
+    success: true,
+    message: "OK",
+    data
   });
 };
 

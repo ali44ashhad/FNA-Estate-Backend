@@ -3,8 +3,8 @@ import { Lead } from "./lead.model";
 
 export type LeadFilters = {
   status?: string;
-  userId?: Types.ObjectId;
-  projectId?: Types.ObjectId;
+  userId?: Types.ObjectId | { $in: Types.ObjectId[] };
+  projectId?: Types.ObjectId | { $in: Types.ObjectId[] };
   assignedOpsId?: Types.ObjectId;
   assignedSalesId?: Types.ObjectId;
 };
@@ -51,6 +51,10 @@ export async function updateLeadById(id: Types.ObjectId, data: Partial<LeadFilte
 
 export async function findLeads(filters: LeadFilters) {
   return Lead.find({ ...filters, isDeleted: false });
+}
+
+export async function findLeadIdsByUserId(userId: Types.ObjectId) {
+  return Lead.distinct("_id", { userId, isDeleted: false });
 }
 
 export async function findLeadsPaged(params: {

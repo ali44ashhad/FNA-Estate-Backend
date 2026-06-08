@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import { AppError } from "../../shared/errors/AppError";
 import { Project } from "../project/project.model";
+import * as UserRepo from "../user/user.repository";
+import * as ProjectRepo from "../project/project.repository";
 import type { CreateLeadInput, ListLeadInput, UpdateLeadInput } from "./lead.dto";
 import * as repo from "./lead.repository";
 import * as CounterRepo from "../counter/counter.repository";
@@ -33,6 +35,10 @@ function assertValidObjectId(id: string, label: string) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new AppError(`Invalid ${label}`, 400);
   }
+}
+
+function isHexObjectIdString(s: string) {
+  return /^[a-fA-F0-9]{24}$/.test(s.trim());
 }
 
 function sanitizeLead(lead: {
@@ -190,9 +196,28 @@ export async function getLeads(input: ListLeadInput, user: RequestingEmployee) {
   const filters: repo.LeadFilters = {};
 
   if (typeof input.status === "string") filters.status = input.status;
-  if (typeof input.userId === "string") filters.userId = new mongoose.Types.ObjectId(input.userId);
-  if (typeof input.projectId === "string")
-    filters.projectId = new mongoose.Types.ObjectId(input.projectId);
+  if (typeof input.userId === "string") {
+    const raw = input.userId.trim();
+    if (raw) {
+      if (isHexObjectIdString(raw)) {
+        filters.userId = new mongoose.Types.ObjectId(raw);
+      } else {
+        const ids = await UserRepo.findUserIdsMatchingNameOrEmail(raw);
+        filters.userId = { $in: ids };
+      }
+    }
+  }
+  if (typeof input.projectId === "string") {
+    const raw = input.projectId.trim();
+    if (raw) {
+      if (isHexObjectIdString(raw)) {
+        filters.projectId = new mongoose.Types.ObjectId(raw);
+      } else {
+        const ids = await ProjectRepo.findProjectIdsMatchingNameOrCode(raw);
+        filters.projectId = { $in: ids };
+      }
+    }
+  }
 
   if (user.role === "sales") {
     assertValidObjectId(user.id, "user id");

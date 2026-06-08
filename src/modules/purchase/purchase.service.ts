@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 import { AppError } from "../../shared/errors/AppError";
 import { Lead } from "../lead/lead.model";
 import * as LeadRepo from "../lead/lead.repository";
-import type { CreatePurchaseInput } from "./purchase.dto";
+import { Visit } from "../visit/visit.model";
+import type { CreatePurchaseInput, ListPurchasesInput } from "./purchase.dto";
 import type { PurchaseStatus } from "./purchase.model";
 import * as repo from "./purchase.repository";
 
@@ -11,6 +12,7 @@ type PublicPurchase = {
   userId: string;
   projectId: string;
   leadId?: string;
+  visitId?: string;
   category: "commercial" | "residential";
   subType: string;
   apartmentConfig?: string;
@@ -19,6 +21,8 @@ type PublicPurchase = {
   inventoryKey: string;
   agreedPrice: number;
   project?: { id: string; name: string; status: string; images: string[] };
+  user?: { id: string; name: string; email?: string };
+  lead?: { id: string; leadNo?: number };
   status: PurchaseStatus;
   createdAt?: Date;
   updatedAt?: Date;
@@ -35,6 +39,7 @@ function sanitizePurchase(p: {
   userId: unknown;
   projectId: unknown;
   leadId?: unknown;
+  visitId?: unknown;
   category: "commercial" | "residential";
   subType: string;
   apartmentConfig?: string;
@@ -43,6 +48,8 @@ function sanitizePurchase(p: {
   inventoryKey: string;
   agreedPrice: number;
   projectIdPopulated?: unknown;
+  userIdPopulated?: unknown;
+  leadIdPopulated?: unknown;
   status: PurchaseStatus;
   createdAt?: Date;
   updatedAt?: Date;
@@ -57,11 +64,31 @@ function sanitizePurchase(p: {
       ? { id: String(proj._id), name: proj.name, status: proj.status, images: proj.images as string[] }
       : undefined;
 
+  const usr = (p.userIdPopulated ?? null) as Record<string, unknown> | null;
+  const user =
+    usr && usr._id && typeof usr.name === "string"
+      ? {
+          id: String(usr._id),
+          name: usr.name,
+          ...(typeof usr.email === "string" ? { email: usr.email } : {})
+        }
+      : undefined;
+
+  const leadPop = (p.leadIdPopulated ?? null) as Record<string, unknown> | null;
+  const lead =
+    leadPop && leadPop._id
+      ? {
+          id: String(leadPop._id),
+          ...(typeof leadPop.leadNo === "number" ? { leadNo: leadPop.leadNo } : {})
+        }
+      : undefined;
+
   return {
     id: String(p._id),
     userId: String(p.userId),
     projectId: String(p.projectId),
     leadId: p.leadId ? String(p.leadId) : undefined,
+    visitId: p.visitId ? String(p.visitId) : undefined,
     category: p.category,
     subType: p.subType,
     apartmentConfig: p.apartmentConfig,
@@ -70,6 +97,8 @@ function sanitizePurchase(p: {
     inventoryKey: p.inventoryKey,
     agreedPrice: p.agreedPrice,
     project,
+    user,
+    lead,
     status: p.status,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt
@@ -104,6 +133,7 @@ export async function createPurchase(input: CreatePurchaseInput) {
   let userId: mongoose.Types.ObjectId;
   let projectId: mongoose.Types.ObjectId;
   let leadId: mongoose.Types.ObjectId | undefined;
+  let visitId: mongoose.Types.ObjectId | undefined;
 
   let category: "commercial" | "residential" | undefined;
   let subType: string | undefined;
@@ -111,6 +141,19 @@ export async function createPurchase(input: CreatePurchaseInput) {
   let unitTypeKey: string | undefined;
   let unitTypeLabel: string | undefined;
   let inventoryKey: string;
+
+  if (typeof input.visitId === "string" && input.visitId.length > 0) {
+    assertValidObjectId(input.visitId, "visitId");
+    const v = await Visit.findOne({ _id: input.visitId, isDeleted: false }).lean();
+    if (!v) throw new AppError("Invalid visit", 400);
+    if ((v as any).status !== "completed") {
+      throw new AppError("Visit must be completed to record a purchase", 400);
+    }
+    if (typeof input.leadId === "string" && String((v as any).leadId) !== input.leadId) {
+      throw new AppError("visitId does not belong to leadId", 400);
+    }
+    visitId = new mongoose.Types.ObjectId(input.visitId);
+  }
 
   if (hasLead) {
     const lead = await assertLeadExists(input.leadId!);
@@ -172,6 +215,7 @@ export async function createPurchase(input: CreatePurchaseInput) {
     projectId,
     ...(leadId ? { leadId } : {}),
     createdByAdmin: byAdmin,
+    ...(visitId ? { visitId } : {}),
     category: category!,
     subType: subType!,
     ...(apartmentConfig ? { apartmentConfig } : {}),
@@ -215,6 +259,7 @@ export async function getUserPurchases(userId: string) {
       projectId: (p as any).projectId?._id ?? (p as any).projectId,
       projectIdPopulated: (p as any).projectId,
       leadId: (p as any).leadId,
+      visitId: (p as any).visitId,
       category: (p as any).category,
       subType: (p as any).subType,
       apartmentConfig: (p as any).apartmentConfig,
@@ -229,3 +274,71 @@ export async function getUserPurchases(userId: string) {
   );
 }
 
+export async function listPurchases(input: ListPurchasesInput) {
+  const filters: repo.PurchaseFilters = {};
+  if (typeof input.status === "string") filters.status = input.status as PurchaseStatus;
+  if (input.from instanceof Date) filters.createdFrom = input.from;
+  if (input.to instanceof Date) filters.createdTo = input.to;
+
+  const limit = Math.min(input.limit, 100);
+  const page = input.page;
+
+  const result = await repo.findPurchasesPaged({
+    filters,
+    page: { page, limit },
+    sort: { sortBy: input.sortBy, sortOrder: input.sortOrder }
+  });
+
+  return {
+    items: result.items.map((p) =>
+      sanitizePurchase({
+        _id: (p as any)._id,
+        userId: (p as any).userId?._id ?? (p as any).userId,
+        userIdPopulated: (p as any).userId,
+        projectId: (p as any).projectId?._id ?? (p as any).projectId,
+        projectIdPopulated: (p as any).projectId,
+        leadId: (p as any).leadId?._id ?? (p as any).leadId,
+        leadIdPopulated: (p as any).leadId,
+        visitId: (p as any).visitId,
+        category: (p as any).category,
+        subType: (p as any).subType,
+        apartmentConfig: (p as any).apartmentConfig,
+        unitTypeKey: (p as any).unitTypeKey,
+        unitTypeLabel: (p as any).unitTypeLabel,
+        inventoryKey: (p as any).inventoryKey,
+        agreedPrice: (p as any).agreedPrice,
+        status: (p as any).status as PurchaseStatus,
+        createdAt: (p as any).createdAt,
+        updatedAt: (p as any).updatedAt
+      })
+    ),
+    page,
+    limit,
+    total: result.total,
+    hasNext: page * limit < result.total
+  };
+}
+
+export async function updatePurchaseStatus(purchaseId: string, status: PurchaseStatus) {
+  assertValidObjectId(purchaseId, "purchase id");
+  const updated = await repo.updatePurchaseStatusById(new mongoose.Types.ObjectId(purchaseId), status);
+  if (!updated) throw new AppError("Purchase not found", 404);
+
+  return sanitizePurchase({
+    _id: (updated as any)._id,
+    userId: (updated as any).userId,
+    projectId: (updated as any).projectId,
+    leadId: (updated as any).leadId,
+    visitId: (updated as any).visitId,
+    category: (updated as any).category,
+    subType: (updated as any).subType,
+    apartmentConfig: (updated as any).apartmentConfig,
+    unitTypeKey: (updated as any).unitTypeKey,
+    unitTypeLabel: (updated as any).unitTypeLabel,
+    inventoryKey: (updated as any).inventoryKey,
+    agreedPrice: (updated as any).agreedPrice,
+    status: (updated as any).status as PurchaseStatus,
+    createdAt: (updated as any).createdAt,
+    updatedAt: (updated as any).updatedAt
+  });
+}
